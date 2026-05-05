@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Logic on Game</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <button id="btn-fullscreen" class="btn-global">🔲</button>
+    <div id="screen-title" class="screen active">
+        <h1 class="game-title">LOGIC ON GAME</h1>
+        <p class="blink-text">Tap to Start</p>
+    </div>
+    
+    <div id="screen-menu" class="screen hidden">
+        <button id="btn-setting" class="btn-global" style="right: 60px;">⚙️</button>
+        <h2>MAIN MENU</h2>
+        <div class="menu-container">
+            <button id="btn-review" class="btn-menu">Review Materi</button>
+            <button id="btn-configure" class="btn-menu">Configure Game</button>
+        </div>
+    </div>
+    
+    <div id="modal-setting" class="modal hidden">
+        <div class="modal-content">
+            <h3>SETTINGS</h3>
+            <label>Timer (Menit): <span id="timer-val">2</span></label>
+            <input type="range" id="setting-timer" min="1" max="5" value="2">
+            
+            <label>Difficulty: <span id="diff-val">⭐⭐⭐</span></label>
+            <input type="range" id="setting-diff" min="1" max="5" value="3">
+            
+            <button id="btn-save-setting" class="btn-menu" style="background:#27ae60; border-color:#fff;">Simpan Pengaturan</button>
+            <button id="btn-reset-game" class="btn-danger">Reset Game Leaderboard</button>
+            <button id="btn-close-setting" class="btn-menu" style="background:#555;">Batal / Tutup</button>
+        </div>
+    </div>
+    
+    <div id="screen-review" class="screen hidden">
+        <button class="btn-back">⬅ Kembali</button>
+        <div class="tab-header">
+            <button id="tab-materi" class="active">Presentasi Materi</button>
+            <button id="tab-quiz">Quiz Evaluasi</button>
+        </div>
+        
+        <div id="content-materi" class="tab-content active"></div>
+        
+        <div id="content-quiz" class="tab-content hidden">
+            <div id="quiz-setup">
+                <p style="margin-bottom: 20px; color: #f1c40f; text-align: center;">Jawab 10 soal acak berikut untuk menguji pemahaman logikamu!</p>
+                <button id="btn-start-quiz" class="btn-menu" style="width: 100%;">MULAI QUIZ</button>
+            </div>
+            <div id="quiz-area" class="hidden">
+                <h3 id="quiz-question" style="line-height: 1.5; margin-bottom: 15px;">Pertanyaan...</h3>
+                <div id="quiz-options" class="options-grid"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal Global (Untuk sistem luar game) -->
+    <div id="custom-modal" class="modal hidden" style="z-index: 999;">
+        <div class="modal-content" style="text-align: center; border-color: #3498db;">
+            <h3 id="custom-modal-title" style="color: #3498db; margin-bottom: 10px;">INFO</h3>
+            <p id="custom-modal-message" style="margin-bottom: 25px; line-height: 1.6;">Pesan disini</p>
+            <div id="custom-modal-buttons" style="display: flex; gap: 15px; justify-content: center;"></div>
+        </div>
+    </div>
+    
+    <div id="screen-game-setup" class="screen hidden">
+        <button class="btn-back">⬅ Kembali</button>
+        <h2>Player Setup</h2>
+        <input type="text" id="p1-name" placeholder="Nama Player 1" maxlength="10">
+        <input type="text" id="p2-name" placeholder="Nama Player 2" maxlength="10">
+        <button id="btn-start-game" class="btn-menu">MULAI TANTANGAN</button>
+    </div>
+    
+    <div id="screen-game" class="screen hidden">
+        <div class="game-header">
+            <button class="btn-back">⬅ Keluar</button>
+            <div class="score-timer">
+                <span>P1 Score: <span id="p1-score">0</span></span>
+                <span id="game-timer">02:00</span>
+                <span>P2 Score: <span id="p2-score">0</span></span>
+            </div>
+        </div>
+        
+        <div class="split-screen">
+            <!-- LAYAR PLAYER 1 -->
+            <div class="player-screen" id="p1-screen">
+                <!-- Overlay Tas P1 -->
+                <div id="inv-p1" class="inv-overlay hidden">
+                    <h4>🎒 ISI TAS P1</h4>
+                    <div id="inv-list-p1" class="inv-grid"></div>
+                    <button class="action-inv btn-modal cancel" data-player="1" style="margin-top: 15px;">TUTUP TAS</button>
+                </div>
+                <!-- Modal Feedback Lokal P1 -->
+                <div id="modal-p1" class="player-modal hidden">
+                    <div class="player-modal-content">
+                        <h4 id="modal-p1-title">INFO</h4>
+                        <p id="modal-p1-message">Pesan</p>
+                        <button class="btn-modal" id="btn-modal-p1-ok">OK</button>
+                    </div>
+                </div>
+
+                <div class="canvas-wrapper">
+                    <canvas id="canvas-p1"></canvas>
+                </div>
+                <div class="controls controls-p1">
+                    <div class="dpad">
+                        <button class="dpad-btn up" data-player="1" data-dir="up">U</button>
+                        <button class="dpad-btn left" data-player="1" data-dir="left">L</button>
+                        <button class="dpad-btn right" data-player="1" data-dir="right">R</button>
+                        <button class="dpad-btn down" data-player="1" data-dir="down">D</button>
+                    </div>
+                    <div class="player-stats">
+                        <div class="stat-text">❤ HP: <span id="p1-hp">100</span></div>
+                        <div class="stat-text">⚔ ATK: <span id="p1-atk">15</span> | 🛡 DEF: <span id="p1-def">5</span></div>
+                        <div class="stat-text">🏁 Stage: <span id="p1-stage">1</span></div>
+                        <div style="display:flex; gap:5px; margin-top:5px; width:100%;">
+                            <button class="logic-btn action-grab" data-player="1" style="flex:1;">AMBIL</button>
+                            <button class="logic-btn action-inv" data-player="1" style="flex:1; background:#e67e22;">🎒 TAS</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- LAYAR PLAYER 2 -->
+            <div class="player-screen" id="p2-screen" style="border-left: 4px solid #fff;">
+                <!-- Overlay Tas P2 -->
+                <div id="inv-p2" class="inv-overlay hidden">
+                    <h4>🎒 ISI TAS P2</h4>
+                    <div id="inv-list-p2" class="inv-grid"></div>
+                    <button class="action-inv btn-modal cancel" data-player="2" style="margin-top: 15px;">TUTUP TAS</button>
+                </div>
+                <!-- Modal Feedback Lokal P2 -->
+                <div id="modal-p2" class="player-modal hidden">
+                    <div class="player-modal-content">
+                        <h4 id="modal-p2-title">INFO</h4>
+                        <p id="modal-p2-message">Pesan</p>
+                        <button class="btn-modal" id="btn-modal-p2-ok">OK</button>
+                    </div>
+                </div>
+
+                <div class="canvas-wrapper">
+                    <canvas id="canvas-p2"></canvas>
+                </div>
+                <div class="controls controls-p2">
+                    <div class="dpad">
+                        <button class="dpad-btn up" data-player="2" data-dir="up">U</button>
+                        <button class="dpad-btn left" data-player="2" data-dir="left">L</button>
+                        <button class="dpad-btn right" data-player="2" data-dir="right">R</button>
+                        <button class="dpad-btn down" data-player="2" data-dir="down">D</button>
+                    </div>
+                    <div class="player-stats">
+                        <div class="stat-text">❤ HP: <span id="p2-hp">100</span></div>
+                        <div class="stat-text">⚔ ATK: <span id="p2-atk">15</span> | 🛡 DEF: <span id="p2-def">5</span></div>
+                        <div class="stat-text">🏁 Stage: <span id="p2-stage">1</span></div>
+                        <div style="display:flex; gap:5px; margin-top:5px; width:100%;">
+                            <button class="logic-btn action-grab" data-player="2" style="flex:1;">AMBIL</button>
+                            <button class="logic-btn action-inv" data-player="2" style="flex:1; background:#e67e22;">🎒 TAS</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="materials.js"></script>
+    <script src="quiz.js"></script>
+    <script src="mazeEngine.js"></script>
+    <script src="gameLogic.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
