@@ -1,53 +1,51 @@
 // gameLogic.js - RPG Stats, Ambil/Gunakan Interaksi, & Fix Render
 let p1State = {};
 let p2State = {};
-window.gameInterval = null;
-window.isGameActive = false;
+let gameInterval;
+let isGameActive = false;
 
 function populateEntities(state) {
     state.monsters = {};
     let emptyCells = [];
     
-    // Titik Krusial yang TIDAK BOLEH ditimpa monster / item
-    let startCoord = {x: 1, y: 1};
-    let keyCoord = {x: 1, y: state.size - 2};
-    let exitCoord = {x: state.size - 2, y: state.size - 2};
-
     for(let y=1; y<state.size-1; y++) {
         for(let x=1; x<state.size-1; x++) {
-            if(state.maze[y][x] === 0) {
-                // PERBAIKAN 2: Mencegah penempatan item/monster di jalur lahir, kunci, dan pintu
-                if ((x === startCoord.x && y === startCoord.y) || 
-                    (x === keyCoord.x && y === keyCoord.y) || 
-                    (x === exitCoord.x && y === exitCoord.y)) {
-                    continue;
-                }
+            // Karena Pintu(3) dan Kunci(2) sudah diset di mazeEngine, 
+            // angka 0 murni merupakan jalan lantai kosong (bebas untuk item)
+            if(state.maze[y][x] === 0 && !(x === 1 && y === 1)) {
                 emptyCells.push({x, y});
             }
         }
     }
-    emptyCells.sort(() => Math.random() - 0.5); // Acak posisi
+    emptyCells.sort(() => Math.random() - 0.5);
     
     let diff = window.GameConfig ? (window.GameConfig.diff || 3) : 3;
     
-    // Penyesuaian agar permainan dapat diselesaikan (Solvable Balancing)
-    // - Semakin tinggi diff: Pedang/Obor jadi barang mewah, namun Apel (Heal) diperbanyak untuk mengimbangi jumlah musuh.
-    let swordCount = Math.max(1, Math.floor((6 - diff) / 1.5)); 
+    let swordCount = Math.max(1, Math.floor((6 - diff) / 1.5));
     let torchCount = Math.max(1, Math.floor((6 - diff) / 2));
-    let appleCount = diff + 2; 
+    let appleCount = diff + 2;
 
     for(let i=0; i<swordCount; i++) { if(emptyCells.length > 0) { let c = emptyCells.pop(); state.maze[c.y][c.x] = 5; } }
     for(let i=0; i<torchCount; i++) { if(emptyCells.length > 0) { let c = emptyCells.pop(); state.maze[c.y][c.x] = 6; } }
     for(let i=0; i<appleCount; i++) { if(emptyCells.length > 0) { let c = emptyCells.pop(); state.maze[c.y][c.x] = 7; } }
     
+    // PEMBUATAN ZONA AMAN UNTUK MONSTER MENGGUNAKAN MANHATTAN DISTANCE
+    let safeDistance = 4 + diff; // Monster dijauhkan minimal sejauh 5 hingga 9 blok dari pemain
+    let monsterCells = emptyCells.filter(c => {
+        let manhattanDist = Math.abs(c.x - 1) + Math.abs(c.y - 1);
+        return manhattanDist >= safeDistance;
+    });
+
+    // Fallback keamanan jika labirin sempit dan filter terlalu kuat
+    if (monsterCells.length === 0) monsterCells = emptyCells;
+
     let monsterCount = Math.floor(state.size / 3) + (diff - 1); 
     for(let i=0; i < monsterCount; i++) {
-        if(emptyCells.length > 0) {
-            let cell = emptyCells.pop();
+        if(monsterCells.length > 0) {
+            let cell = monsterCells.pop();
             state.maze[cell.y][cell.x] = 4; // Monster
             let isDark = Math.random() > 0.5;
             
-            // Rumus scalling Atribut agar masuk akal dan adil bagi pemain pemula
             let vHp = 20 + (diff * 5);
             let vAtk = 10 + (diff * 2);
             let vDef = Math.floor(diff / 2);
@@ -75,11 +73,10 @@ function initGame(p1Name, p2Name) {
     populateEntities(p1State); populateEntities(p2State);
     updateStatsUI(1); updateStatsUI(2);
     
-    // SISTEM TIMER
-    clearInterval(window.gameInterval); 
+    clearInterval(gameInterval); 
     let timerMinutes = window.GameConfig.timer || 2;
     let timeRemaining = timerMinutes * 60; 
-    window.isGameActive = true;
+    isGameActive = true;
     
     const timerUI = document.getElementById('game-timer');
     function updateTimerUI() {
@@ -89,22 +86,20 @@ function initGame(p1Name, p2Name) {
     }
     
     updateTimerUI();
-    window.gameInterval = setInterval(() => {
-        if (!window.isGameActive) return;
-        
-        // Mematikan paksa timer jika berada di luar layar game (fallback keamanan)
+    gameInterval = setInterval(() => {
         if (document.getElementById('screen-game').classList.contains('hidden')) {
-            clearInterval(window.gameInterval);
-            window.isGameActive = false;
+            clearInterval(gameInterval);
+            isGameActive = false;
             return;
         }
 
+        if (!isGameActive) return;
         timeRemaining--;
         updateTimerUI();
 
         if (timeRemaining <= 0) {
-            clearInterval(window.gameInterval);
-            window.isGameActive = false;
+            clearInterval(gameInterval);
+            isGameActive = false;
             window.CustomDialog.alert(
                 `Waktu Habis!\n\nP1 Score: ${p1State.score}\nP2 Score: ${p2State.score}`, 
                 "GAME OVER", 
@@ -129,7 +124,6 @@ function initGame(p1Name, p2Name) {
     setTimeout(resizeCanvas, 100); 
 }
 
-// Fungsi Notifikasi Independen Per Layar
 function showPlayerModal(playerObj, title, message) {
     document.getElementById(`modal-p${playerObj}-title`).innerText = title;
     document.getElementById(`modal-p${playerObj}-message`).innerText = message;
@@ -290,7 +284,7 @@ function movePlayer(playerObj, dir) {
 
 // --- GLOBAL EVENT LISTENER UNTUK KONTROL ---
 document.addEventListener('pointerdown', (e) => {
-    if (!window.isGameActive) return;
+    if (!isGameActive) return;
 
     let btn = e.target.closest('.dpad-btn, .action-grab, .action-inv, .action-use-item');
     if (!btn) return;
