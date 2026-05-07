@@ -1,5 +1,5 @@
 // app.js - Navigasi dan Konfigurasi UI
-window.GameConfig = { timer: 2, diff: 3 }; // Variabel Global Pengaturan
+window.GameConfig = { timer: 2, diff: 3 };
 
 window.CustomDialog = {
   show: function(title, message, buttons) {
@@ -20,7 +20,6 @@ window.CustomDialog = {
       });
       btnContainer.appendChild(btn);
     });
-    
     modal.classList.remove('hidden');
   },
   alert: function(message, title = "PERHATIAN", callback = null) {
@@ -52,25 +51,15 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-review').addEventListener('pointerdown', () => switchScreen('review'));
   document.getElementById('btn-configure').addEventListener('pointerdown', () => switchScreen('gameSetup'));
   
-  // PERBAIKAN 1: Logika Tombol Kembali (Mencegah Ketidaksengajaan)
   document.querySelectorAll('.btn-back').forEach(btn => {
     btn.addEventListener('pointerdown', (e) => {
-      // Jika tombol ditekan saat berada di dalam layar game
       if (e.target.closest('#screen-game')) {
-        window.CustomDialog.confirm(
-          "Apakah kamu yakin ingin keluar dari tantangan? Progress akan terhenti dan hilang.",
-          "KELUAR PERMAINAN?",
-          () => {
-            // Jika pemain menekan YA
-            if (window.gameInterval) clearInterval(window.gameInterval);
-            window.isGameActive = false;
-            switchScreen('menu');
-          }
-        );
-      } else {
-        // Jika menekan tombol kembali di menu lain (Review / Setup)
-        switchScreen('menu');
-      }
+        window.CustomDialog.confirm("Keluar dari game? Progress akan hilang.", "KELUAR?", () => {
+          if (window.gameInterval) clearInterval(window.gameInterval);
+          window.isGameActive = false;
+          switchScreen('menu');
+        });
+      } else switchScreen('menu');
     });
   });
   
@@ -82,24 +71,30 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('timer-val').innerText = e.target.value;
   });
   
-  document.getElementById('setting-diff').addEventListener('input', (e) => {
-    const stars = '⭐'.repeat(e.target.value);
-    document.getElementById('diff-val').innerText = stars;
+  // Logika Interaksi Star Rating
+  const stars = document.querySelectorAll('.star-rating .star');
+  const diffInput = document.getElementById('setting-diff');
+  stars.forEach(star => {
+    star.addEventListener('pointerdown', (e) => {
+      let val = parseInt(e.target.dataset.val);
+      diffInput.value = val;
+      stars.forEach(s => {
+        if (parseInt(s.dataset.val) <= val) s.classList.add('active');
+        else s.classList.remove('active');
+      });
+    });
   });
   
   document.getElementById('btn-save-setting').addEventListener('pointerdown', () => {
     window.GameConfig.timer = parseInt(document.getElementById('setting-timer').value);
     window.GameConfig.diff = parseInt(document.getElementById('setting-diff').value);
     modalSetting.classList.add('hidden');
-    window.CustomDialog.alert("Konfigurasi berhasil diterapkan dan disimpan!", "BERHASIL");
+    window.CustomDialog.alert("Konfigurasi berhasil diterapkan!", "BERHASIL");
   });
   
   document.getElementById('btn-fullscreen').addEventListener('pointerdown', () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(err => console.log(err));
-    } else {
-      document.exitFullscreen();
-    }
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(err => console.log(err));
+    else document.exitFullscreen();
   });
   
   document.getElementById('btn-start-game').addEventListener('pointerdown', () => {

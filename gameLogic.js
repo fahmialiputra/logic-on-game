@@ -1,8 +1,57 @@
-// gameLogic.js - RPG Stats, Ambil/Gunakan Interaksi, & Fix Render
-let p1State = {};
-let p2State = {};
+// gameLogic.js - RPG Stats, Database Item, Spacing Algoritma, Durasi Buff, Toast & Combat AI
+
+window.ITEM_DB = {
+    // ATK BUFFS (ID 10-12)
+    10: { name: 'Pedang Kayu', emoji: '🗡️', type: 'atk', val: 10, dur: 15 },
+    11: { name: 'Dua Pedang', emoji: '⚔️', type: 'atk', val: 18, dur: 20 },
+    12: { name: 'Pedang Emas', emoji: '🔱', type: 'atk', val: 30, dur: 25 },
+    
+    // UTILITY / ANTI-DARK (ID 13-15)
+    13: { name: '3 Lilin', emoji: '🕯️', type: 'util', utilType: 'light', dur: 15 },
+    14: { name: 'Obor', emoji: '🔥', type: 'util', utilType: 'light', dur: 25 },
+    15: { name: 'Jubah Anti-Vampir', emoji: '🧥', type: 'util', utilType: 'light', defBonus: 5, dur: 30 },
+    
+    // DEF BUFFS (ID 16-18)
+    16: { name: 'Perisai Kayu', emoji: '🪵', type: 'def', val: 5, dur: 15 },
+    17: { name: 'Baju Armor', emoji: '🦺', type: 'def', val: 12, dur: 25 },
+    18: { name: 'Perisai Besi', emoji: '🛡️', type: 'def', val: 20, dur: 30 },
+    
+    // HEALS (ID 19-23)
+    19: { name: 'Apel', emoji: '🍎', type: 'heal', val: 20 },
+    20: { name: 'Jus Buah', emoji: '🧃', type: 'heal', val: 35 },
+    21: { name: 'Daging Sapi', emoji: '🥩', type: 'heal', val: 50 },
+    22: { name: 'Daging Rusa', emoji: '🍗', type: 'heal', val: 75 },
+    23: { name: 'Obat', emoji: '💊', type: 'heal', val: 100 }
+};
+
+let p1State = {}; let p2State = {};
 let gameInterval;
-let isGameActive = false;
+let enemyInterval; // Interval khusus untuk pergerakan AI Musuh
+window.isGameActive = false;
+
+// Fungsi Menampilkan Notifikasi Toast
+function showToast(playerObj, title, message) {
+    let toast = document.getElementById(`toast-p${playerObj}`);
+    document.getElementById(`toast-p${playerObj}-title`).innerText = title;
+    document.getElementById(`toast-p${playerObj}-msg`).innerText = message;
+    
+    toast.classList.remove('hidden');
+    if(toast.timeoutId) clearTimeout(toast.timeoutId);
+    toast.timeoutId = setTimeout(() => { toast.classList.add('hidden'); }, 2500);
+}
+
+// Fungsi Memicu Efek Visual (Guncangan / Cahaya)
+function triggerEffect(playerObj, type) {
+    let screen = document.getElementById(`p${playerObj}-screen`);
+    if(!screen) return;
+    
+    // Hapus kelas efek sebelumnya agar animasi bisa ter-reset jika terjadi beruntun
+    screen.classList.remove('effect-damage', 'effect-heal', 'effect-buff', 'effect-attack');
+    void screen.offsetWidth; // Memaksa perenderan ulang (reflow) DOM
+    
+    screen.classList.add(`effect-${type}`);
+    setTimeout(() => { screen.classList.remove(`effect-${type}`); }, 400); // Bersihkan kelas
+}
 
 function populateEntities(state) {
     state.monsters = {};
@@ -10,62 +59,139 @@ function populateEntities(state) {
     
     for(let y=1; y<state.size-1; y++) {
         for(let x=1; x<state.size-1; x++) {
-            // Karena Pintu(3) dan Kunci(2) sudah diset di mazeEngine, 
-            // angka 0 murni merupakan jalan lantai kosong (bebas untuk item)
-            if(state.maze[y][x] === 0 && !(x === 1 && y === 1)) {
-                emptyCells.push({x, y});
-            }
+            if(state.maze[y][x] === 0 && !(x === 1 && y === 1)) emptyCells.push({x, y});
         }
     }
     emptyCells.sort(() => Math.random() - 0.5);
     
-    let diff = window.GameConfig ? (window.GameConfig.diff || 3) : 3;
+    let diff = window.GameConfig.diff || 3;
     
-    let swordCount = Math.max(1, Math.floor((6 - diff) / 1.5));
-    let torchCount = Math.max(1, Math.floor((6 - diff) / 2));
-    let appleCount = diff + 2;
+    let monsterCount = Math.floor(state.size / 4) + diff; 
+    let safeDistFromPlayer = 4 + diff; 
+    let safeDistBetweenMonsters = 3;   
+    let placedMonsters = [];
 
-    for(let i=0; i<swordCount; i++) { if(emptyCells.length > 0) { let c = emptyCells.pop(); state.maze[c.y][c.x] = 5; } }
-    for(let i=0; i<torchCount; i++) { if(emptyCells.length > 0) { let c = emptyCells.pop(); state.maze[c.y][c.x] = 6; } }
-    for(let i=0; i<appleCount; i++) { if(emptyCells.length > 0) { let c = emptyCells.pop(); state.maze[c.y][c.x] = 7; } }
+    for(let i = emptyCells.length - 1; i >= 0 && placedMonsters.length < monsterCount; i--) {
+        let cell = emptyCells[i];
+        
+        let distToPlayer = Math.abs(cell.x - 1) + Math.abs(cell.y - 1);
+        if (distToPlayer < safeDistFromPlayer) continue;
+
+        let isTooClose = placedMonsters.some(m => (Math.abs(m.x - cell.x) + Math.abs(m.y - cell.y)) < safeDistBetweenMonsters);
+        if (isTooClose) continue;
+
+        state.maze[cell.y][cell.x] = 4; 
+        placedMonsters.push(cell);
+        
+        let isDark = Math.random() > 0.5;
+        let hpScale = state.stage * 5; 
+        let atkScale = state.stage * 2;
+        
+        state.monsters[`${cell.x},${cell.y}`] = isDark ? 
+             { type: 'dark', emoji: '🧛', hp: 30+(diff*5)+hpScale, atk: 12+(diff*3)+atkScale, def: diff, name: 'Vampire' } : 
+             { type: 'beast', emoji: '🐺', hp: 25+(diff*5)+hpScale, atk: 10+(diff*2)+atkScale, def: diff+2, name: 'Werewolf' };
+             
+        emptyCells.splice(i, 1);
+    }
     
-    // PEMBUATAN ZONA AMAN UNTUK MONSTER MENGGUNAKAN MANHATTAN DISTANCE
-    let safeDistance = 4 + diff; // Monster dijauhkan minimal sejauh 5 hingga 9 blok dari pemain
-    let monsterCells = emptyCells.filter(c => {
-        let manhattanDist = Math.abs(c.x - 1) + Math.abs(c.y - 1);
-        return manhattanDist >= safeDistance;
-    });
+    let mapSizeMultiplier = Math.max(1, Math.floor(state.size / 10));
+    let weaponCount = Math.max(1, 4 - Math.floor(diff / 2)) * mapSizeMultiplier;
+    let utilCount = Math.max(1, 4 - Math.floor(diff / 2)) * mapSizeMultiplier;
+    let healCount = Math.max(2, 7 - diff) * mapSizeMultiplier; 
+    
+    for(let i=0; i<healCount && emptyCells.length > 0; i++) {
+        let c = emptyCells.pop();
+        let id = diff >= 4 ? (19 + Math.floor(Math.random() * 2)) : (diff === 3 ? (19 + Math.floor(Math.random() * 3)) : (20 + Math.floor(Math.random() * 4)));
+        state.maze[c.y][c.x] = id; 
+    }
+    
+    for(let i=0; i<weaponCount && emptyCells.length > 0; i++) {
+        let c = emptyCells.pop();
+        state.maze[c.y][c.x] = 10 + Math.floor(Math.random() * 3);
+    }
+    
+    for(let i=0; i<utilCount && emptyCells.length > 0; i++) {
+        let c = emptyCells.pop();
+        state.maze[c.y][c.x] = Math.random() > 0.5 ? 13 + Math.floor(Math.random() * 3) : 16 + Math.floor(Math.random() * 3);
+    }
+}
 
-    // Fallback keamanan jika labirin sempit dan filter terlalu kuat
-    if (monsterCells.length === 0) monsterCells = emptyCells;
-
-    let monsterCount = Math.floor(state.size / 3) + (diff - 1); 
-    for(let i=0; i < monsterCount; i++) {
-        if(monsterCells.length > 0) {
-            let cell = monsterCells.pop();
-            state.maze[cell.y][cell.x] = 4; // Monster
-            let isDark = Math.random() > 0.5;
+// LOGIKA AI MUSUH (Hanya aktif jika Diff > 3)
+function processEnemyAI(playerObj, state) {
+    if (state.hp <= 0) return false;
+    
+    let newMonsters = {};
+    let playerAttacked = false;
+    let changed = false; 
+    
+    for (let key in state.monsters) {
+        let m = state.monsters[key];
+        let [mx, my] = key.split(',').map(Number);
+        
+        // Cek Jarak (Manhattan Distance) ke Pemain
+        let dist = Math.abs(state.x - mx) + Math.abs(state.y - my);
+        
+        if (dist === 1) { 
+            // Aggro! Musuh berada di sebelah pemain, Musuh menyerang duluan
+            let mAtk = m.atk;
+            if(m.type === 'dark' && state.lightBuff === 0) mAtk += 15;
+            let dmgToPlayer = Math.max(0, mAtk - state.def);
             
-            let vHp = 20 + (diff * 5);
-            let vAtk = 10 + (diff * 2);
-            let vDef = Math.floor(diff / 2);
+            state.hp -= dmgToPlayer;
+            showToast(playerObj, "AWAS!", `Diserang ${m.emoji} -${dmgToPlayer} HP.`);
+            triggerEffect(playerObj, 'damage');
             
-            let wHp = 15 + (diff * 5);
-            let wAtk = 8 + (diff * 2);
-            let wDef = Math.floor(diff / 2) + 1;
+            playerAttacked = true; changed = true;
+            newMonsters[`${mx},${my}`] = m; // Musuh tetap di tempatnya saat menyerang
+            
+            if (state.hp <= 0) {
+                state.hp = 0;
+                window.CustomDialog.alert(`Player ${playerObj} tewas diserang ${m.name}.`, "GAME OVER");
+                window.isGameActive = false;
+                break;
+            }
+        } else if (dist <= 4 && dist > 1) { 
+            // AI Mengejar Pemain Jika di area pantauan (Jarak 2-4)
+            let dirs = [[0,-1], [0,1], [-1,0], [1,0]];
+            
+            // Urutkan gerakan berdasarkan yang paling mendekatkan ke pemain
+            dirs.sort((a, b) => {
+                let distA = Math.abs(state.x - (mx + a[0])) + Math.abs(state.y - (my + a[1]));
+                let distB = Math.abs(state.x - (mx + b[0])) + Math.abs(state.y - (my + b[1]));
+                return distA - distB; 
+            });
 
-            state.monsters[`${cell.x},${cell.y}`] = isDark ? 
-                 { type: 'dark', emoji: '🧛', hp: vHp, atk: vAtk, def: vDef, name: 'Vampire' } : 
-                 { type: 'beast', emoji: '🐺', hp: wHp, atk: wAtk, def: wDef, name: 'Werewolf' };
+            let moved = false;
+            for (let d of dirs) {
+                let nx = mx + d[0]; let ny = my + d[1];
+                // Syarat gerak: Grid kosong (0) dan tidak ada monster lain di sana
+                if (state.maze[ny][nx] === 0 && !newMonsters[`${nx},${ny}`]) {
+                    state.maze[my][mx] = 0; 
+                    state.maze[ny][nx] = 4;
+                    newMonsters[`${nx},${ny}`] = m;
+                    moved = true; changed = true;
+                    break;
+                }
+            }
+            if (!moved) newMonsters[`${mx},${my}`] = m; // Terjebak
+        } else {
+            // Pemain di luar area, musuh diam
+            newMonsters[`${mx},${my}`] = m;
         }
     }
+    state.monsters = newMonsters;
+    if (playerAttacked) updateStatsUI(playerObj);
+    return changed;
 }
 
 function initGame(p1Name, p2Name) {
     let diff = window.GameConfig.diff || 3;
     let size = 11 + ((diff - 1) * 2); 
     
-    const baseState = () => ({ x: 1, y: 1, hasKey: false, hasTorchBuff: false, inventory: [], score: 0, hp: 100, atk: 15, def: 5, stage: 1, size: size });
+    const baseState = () => ({ 
+        x: 1, y: 1, hasKey: false, inventory: [], activeBuffs: [], lightBuff: 0, 
+        score: 0, hp: 100, atk: 15, def: 5, stage: 1, size: size 
+    });
     
     p1State = { ...baseState(), id: 1, theme: 'ruins', maze: generateMaze(size, size) };
     p2State = { ...baseState(), id: 2, theme: 'jungle', maze: generateMaze(size, size) };
@@ -74,67 +200,46 @@ function initGame(p1Name, p2Name) {
     updateStatsUI(1); updateStatsUI(2);
     
     clearInterval(gameInterval); 
-    let timerMinutes = window.GameConfig.timer || 2;
-    let timeRemaining = timerMinutes * 60; 
-    isGameActive = true;
+    clearInterval(enemyInterval);
+    
+    let timeRemaining = (window.GameConfig.timer || 2) * 60; 
+    window.isGameActive = true;
     
     const timerUI = document.getElementById('game-timer');
-    function updateTimerUI() {
+    gameInterval = setInterval(() => {
+        if (!window.isGameActive) return;
+        timeRemaining--;
         let m = Math.floor(timeRemaining / 60).toString().padStart(2, '0');
         let s = (timeRemaining % 60).toString().padStart(2, '0');
         timerUI.innerText = `${m}:${s}`;
-    }
-    
-    updateTimerUI();
-    gameInterval = setInterval(() => {
-        if (document.getElementById('screen-game').classList.contains('hidden')) {
-            clearInterval(gameInterval);
-            isGameActive = false;
-            return;
-        }
-
-        if (!isGameActive) return;
-        timeRemaining--;
-        updateTimerUI();
 
         if (timeRemaining <= 0) {
-            clearInterval(gameInterval);
-            isGameActive = false;
-            window.CustomDialog.alert(
-                `Waktu Habis!\n\nP1 Score: ${p1State.score}\nP2 Score: ${p2State.score}`, 
-                "GAME OVER", 
-                () => {
-                    document.getElementById('screen-game').classList.add('hidden');
-                    document.getElementById('screen-menu').classList.remove('hidden');
-                }
-            );
+            clearInterval(gameInterval); clearInterval(enemyInterval);
+            window.isGameActive = false;
+            window.CustomDialog.alert(`Waktu Habis!\nP1: ${p1State.score} | P2: ${p2State.score}`, "GAME OVER", () => {
+                document.getElementById('screen-game').classList.add('hidden');
+                document.getElementById('screen-menu').classList.remove('hidden');
+            });
         }
     }, 1000);
     
+    // Interval AI: Dijalankan setiap 1 detik jika Difficulty > 3
+    enemyInterval = setInterval(() => {
+        if (!window.isGameActive) return;
+        if (diff > 3) {
+            let redraw1 = processEnemyAI(1, p1State);
+            let redraw2 = processEnemyAI(2, p2State);
+            if (redraw1 || redraw2) requestAnimationFrame(drawGame);
+        }
+    }, 1000); 
+
     function resizeCanvas() {
-        let canvas1 = document.getElementById('canvas-p1');
-        let canvas2 = document.getElementById('canvas-p2');
-        canvas1.width = canvas1.parentElement.clientWidth || 300;
-        canvas1.height = canvas1.parentElement.clientHeight || 300;
-        canvas2.width = canvas2.parentElement.clientWidth || 300;
-        canvas2.height = canvas2.parentElement.clientHeight || 300;
+        let canvas1 = document.getElementById('canvas-p1'); let canvas2 = document.getElementById('canvas-p2');
+        canvas1.width = canvas1.parentElement.clientWidth || 300; canvas1.height = canvas1.parentElement.clientHeight || 300;
+        canvas2.width = canvas2.parentElement.clientWidth || 300; canvas2.height = canvas2.parentElement.clientHeight || 300;
         drawGame();
     }
-    window.addEventListener('resize', resizeCanvas);
-    setTimeout(resizeCanvas, 100); 
-}
-
-function showPlayerModal(playerObj, title, message) {
-    document.getElementById(`modal-p${playerObj}-title`).innerText = title;
-    document.getElementById(`modal-p${playerObj}-message`).innerText = message;
-    
-    const modal = document.getElementById(`modal-p${playerObj}`);
-    modal.classList.remove('hidden');
-    
-    const okBtn = document.getElementById(`btn-modal-p${playerObj}-ok`);
-    let newBtn = okBtn.cloneNode(true);
-    okBtn.parentNode.replaceChild(newBtn, okBtn);
-    newBtn.addEventListener('pointerdown', () => modal.classList.add('hidden'));
+    window.addEventListener('resize', resizeCanvas); setTimeout(resizeCanvas, 100); 
 }
 
 function updateStatsUI(playerObj) {
@@ -142,21 +247,29 @@ function updateStatsUI(playerObj) {
     document.getElementById(`p${playerObj}-hp`).innerText = state.hp;
     document.getElementById(`p${playerObj}-atk`).innerText = state.atk;
     document.getElementById(`p${playerObj}-def`).innerText = state.def;
-    document.getElementById(`p${playerObj}-score`).innerText = state.score;
     document.getElementById(`p${playerObj}-stage`).innerText = state.stage;
+    document.getElementById(`p${playerObj}-score`).innerText = state.score;
+    
+    let buffStr = state.activeBuffs.map(b => b.emoji).join(' ');
+    document.getElementById(`p${playerObj}-buffs`).innerText = buffStr || '-';
     
     let invContainer = document.getElementById(`inv-list-p${playerObj}`);
     invContainer.innerHTML = '';
     
     if (state.inventory.length === 0) {
-        invContainer.innerHTML = '<p style="color:#aaa; font-size:0.8rem; width:100%; text-align:center;">Tas Kosong</p>';
+        invContainer.innerHTML = '<p style="color:#aaa; width:100%; text-align:center;">Tas Kosong</p>';
     } else {
-        state.inventory.forEach((item, index) => {
+        state.inventory.forEach((itemId, index) => {
             let btn = document.createElement('button');
             btn.className = 'inv-item-btn action-use-item';
-            btn.innerText = item;
             btn.dataset.player = playerObj;
             btn.dataset.index = index;
+            
+            if(itemId === 'key') btn.innerHTML = `🔑<br><small>Kunci Keluar</small>`;
+            else {
+                let d = window.ITEM_DB[itemId];
+                btn.innerHTML = `${d.emoji}<br><small>${d.name}</small>`;
+            }
             invContainer.appendChild(btn);
         });
     }
@@ -171,135 +284,155 @@ function drawGame() {
 
 function grabItem(playerObj) {
     let state = playerObj == 1 ? p1State : p2State;
-    let currentCell = state.maze[state.y][state.x];
-    if ([2, 5, 6, 7].includes(currentCell)) {
-        if (currentCell === 2) { state.inventory.push('🔑'); state.hasKey = true; }
-        else if (currentCell === 5) state.inventory.push('🗡️');
-        else if (currentCell === 6) state.inventory.push('🕯️');
-        else if (currentCell === 7) state.inventory.push('🍎');
+    let cell = state.maze[state.y][state.x];
+    
+    if (cell === 2 || (cell >= 10 && cell <= 23)) {
+        if(state.inventory.length >= 6) {
+            showToast(playerObj, "TAS PENUH", "Maksimal 6 barang!"); return;
+        }
         
-        state.maze[state.y][state.x] = 0;
-        state.score += 20;
-        showPlayerModal(playerObj, "INFO AMBIL", "Barang berhasil dimasukkan ke tas!");
+        let itemName = "";
+        if (cell === 2) { state.inventory.push('key'); state.hasKey = true; itemName = "Kunci Emas 🔑"; }
+        else { 
+            state.inventory.push(cell); 
+            itemName = `${window.ITEM_DB[cell].emoji} ${window.ITEM_DB[cell].name}`;
+        }
+        
+        state.maze[state.y][state.x] = 0; state.score += 15;
+        showToast(playerObj, "AMBIL ITEM", `${itemName} masuk tas.`);
         updateStatsUI(playerObj); drawGame();
     } else {
-        showPlayerModal(playerObj, "INFO", "Kamu tidak berdiri di atas barang.");
+        showToast(playerObj, "KOSONG", "Tidak ada item di bawahmu.");
     }
 }
 
 function useItem(playerObj, itemIndex) {
     let state = playerObj == 1 ? p1State : p2State;
-    let item = state.inventory[itemIndex];
-    if (!item) return;
+    let itemId = state.inventory[itemIndex];
+    if (!itemId) return;
     
-    let used = false;
-    if (item === '🍎') {
-        state.hp = Math.min(100, state.hp + 30);
-        showPlayerModal(playerObj, "GUNAKAN ITEM", "Nyam! Makan Apel. HP +30.");
-        used = true;
-    } else if (item === '🗡️') {
-        state.atk += 10;
-        showPlayerModal(playerObj, "GUNAKAN ITEM", "Pedang dipakai! ATK +10.");
-        used = true;
-    } else if (item === '🕯️') {
-        state.hasTorchBuff = true;
-        showPlayerModal(playerObj, "GUNAKAN ITEM", "Obor menyala! Serangan tambahan vs Vampire.");
-        used = true;
-    } else if (item === '🔑') {
-        showPlayerModal(playerObj, "INFO", "Kunci akan terpakai otomatis saat menyentuh pintu.");
+    if (itemId === 'key') {
+        showToast(playerObj, "INFO", "Tabrak pintu untuk pakai kunci otomatis."); return;
     }
     
-    if (used) {
-        state.inventory.splice(itemIndex, 1);
-        document.getElementById(`inv-p${playerObj}`).classList.add('hidden');
+    let item = window.ITEM_DB[itemId];
+    state.inventory.splice(itemIndex, 1);
+    document.getElementById(`inv-p${playerObj}`).classList.add('hidden'); 
+    
+    if(item.type === 'heal') {
+        state.hp = Math.min(200, state.hp + item.val);
+        triggerEffect(playerObj, 'heal'); // Panggil Efek Visual
+        showToast(playerObj, "HEAL", `Gluk! +${item.val} HP.`);
+    } else {
+        let buffObj = { id: item.id, emoji: item.emoji };
+        state.activeBuffs.push(buffObj);
+        triggerEffect(playerObj, 'buff'); // Panggil Efek Visual
+        
+        if (item.type === 'atk') state.atk += item.val;
+        if (item.type === 'def') state.def += item.val;
+        if (item.type === 'util' && item.utilType === 'light') {
+            state.lightBuff++;
+            if(item.defBonus) state.def += item.defBonus;
+        }
+        
+        showToast(playerObj, "BUFF AKTIF", `${item.name} aktif selama ${item.dur} detik!`);
+        
+        setTimeout(() => {
+            if (item.type === 'atk') state.atk -= item.val;
+            if (item.type === 'def') state.def -= item.val;
+            if (item.type === 'util' && item.utilType === 'light') {
+                state.lightBuff--;
+                if(item.defBonus) state.def -= item.defBonus;
+            }
+            
+            let idx = state.activeBuffs.indexOf(buffObj);
+            if (idx > -1) state.activeBuffs.splice(idx, 1);
+            showToast(playerObj, "BUFF HABIS", `Efek ${item.name} telah selesai.`);
+            updateStatsUI(playerObj);
+        }, item.dur * 1000);
     }
     updateStatsUI(playerObj); drawGame();
 }
 
 function movePlayer(playerObj, dir) {
     let state = playerObj == 1 ? p1State : p2State;
-    if (state.hp <= 0) return; 
+    if (state.hp <= 0 || !window.isGameActive) return; 
     let nextX = state.x; let nextY = state.y;
     
-    if (dir === 'up') nextY--;
-    else if (dir === 'down') nextY++;
-    else if (dir === 'left') nextX--;
-    else if (dir === 'right') nextX++;
+    if (dir === 'up') nextY--; else if (dir === 'down') nextY++;
+    else if (dir === 'left') nextX--; else if (dir === 'right') nextX++;
     
     if (nextX >= 0 && nextX < state.size && nextY >= 0 && nextY < state.size) {
         let targetCell = state.maze[nextY][nextX];
         if (targetCell !== 1) { 
             if (targetCell === 4) {
+                // Pemain Menyerang Monster Secara Manual (Bump)
+                triggerEffect(playerObj, 'attack'); // Efek Animasi
+                
                 let monster = state.monsters[`${nextX},${nextY}`];
                 if(monster) {
                     let pAtk = state.atk; let mAtk = monster.atk;
-                    if(monster.type === 'dark' && !state.hasTorchBuff) mAtk += 10; 
-                    else if(monster.type === 'dark' && state.hasTorchBuff) pAtk += 15; 
+                    if(monster.type === 'dark' && state.lightBuff === 0) mAtk += 15; 
+                    else if(monster.type === 'dark' && state.lightBuff > 0) pAtk += 20; 
                     
                     let dmgToMonster = Math.max(1, pAtk - monster.def);
                     let dmgToPlayer = Math.max(0, mAtk - state.def);
                     
                     monster.hp -= dmgToMonster;
+                    
                     if(monster.hp > 0) {
                         state.hp -= dmgToPlayer;
+                        // Serang Balik
+                        triggerEffect(playerObj, 'damage');
+                        showToast(playerObj, "BENTROK!", `Diserang balik! -${dmgToPlayer} HP.`);
                     } else {
                         state.hp -= dmgToPlayer; 
                         state.maze[nextY][nextX] = 0; 
                         delete state.monsters[`${nextX},${nextY}`];
-                        state.score += 100;
-                        showPlayerModal(playerObj, "MENANG!", `${monster.name} berhasil dikalahkan!`);
+                        state.score += 150;
+                        showToast(playerObj, "MENANG!", `${monster.emoji} hancur!`);
                         state.x = nextX; state.y = nextY;
                     }
                     if(state.hp <= 0) {
                         state.hp = 0;
-                        showPlayerModal(playerObj, "GAME OVER", `Kamu telah gugur dalam labirin.`);
+                        window.CustomDialog.alert(`Player ${playerObj} telah gugur dalam labirin.`, "MATI");
+                        window.isGameActive = false;
                     }
                 }
             } else if (targetCell === 3) {
                 if (state.hasKey) {
-                    showPlayerModal(playerObj, "STAGE CLEAR!", `Mantap! Lanjut ke stage berikutnya.`);
-                    
-                    state.score += 200;
-                    state.stage += 1;
-                    state.size += 2; 
+                    showToast(playerObj, "STAGE CLEAR!", `Mantap! Naik level.`);
+                    state.score += 300; state.stage += 1; state.size += 2; 
                     state.maze = generateMaze(state.size, state.size);
                     state.x = 1; state.y = 1;
                     
-                    let keyIdx = state.inventory.indexOf('🔑');
+                    let keyIdx = state.inventory.indexOf('key');
                     if (keyIdx > -1) state.inventory.splice(keyIdx, 1);
                     state.hasKey = false;
                     
                     populateEntities(state);
                 } else {
-                    showPlayerModal(playerObj, "TERKUNCI", "Pintu keluar butuh kunci emas 🔑.");
+                    showToast(playerObj, "TERKUNCI", "Pintu keluar butuh kunci emas 🔑.");
                 }
             } else {
                 state.x = nextX; state.y = nextY;
             }
         }
     }
-    updateStatsUI(playerObj);
-    requestAnimationFrame(drawGame);
+    updateStatsUI(playerObj); requestAnimationFrame(drawGame);
 }
 
-// --- GLOBAL EVENT LISTENER UNTUK KONTROL ---
 document.addEventListener('pointerdown', (e) => {
-    if (!isGameActive) return;
-
+    if (!window.isGameActive) return;
     let btn = e.target.closest('.dpad-btn, .action-grab, .action-inv, .action-use-item');
     if (!btn) return;
-    
     e.preventDefault();
-    const player = btn.dataset.player;
     
-    if (btn.classList.contains('action-grab')) {
-        grabItem(player);
-    } else if (btn.classList.contains('action-inv')) {
-        document.getElementById(`inv-p${player}`).classList.toggle('hidden');
-    } else if (btn.classList.contains('action-use-item')) {
-        const itemIdx = btn.dataset.index;
-        useItem(player, itemIdx);
-    } else {
+    const player = btn.dataset.player;
+    if (btn.classList.contains('action-grab')) grabItem(player);
+    else if (btn.classList.contains('action-inv')) document.getElementById(`inv-p${player}`).classList.toggle('hidden');
+    else if (btn.classList.contains('action-use-item')) useItem(player, btn.dataset.index);
+    else {
         const dir = btn.dataset.dir;
         if (player && dir) movePlayer(player, dir);
     }
