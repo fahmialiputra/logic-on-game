@@ -1,4 +1,4 @@
-// gameLogic.js - RPG Stats, Database Item, AI Aggro & Roaming, Efek Visual
+// gameLogic.js - RPG Stats, Database Item, AI Aggro & Roaming Lokal, Efek Visual
 
 window.ITEM_DB = {
     10: { name: 'Pedang Kayu', emoji: '🗡️', type: 'atk', val: 10, dur: 15 },
@@ -29,6 +29,21 @@ function showToast(playerObj, title, message) {
     toast.classList.remove('hidden');
     if(toast.timeoutId) clearTimeout(toast.timeoutId);
     toast.timeoutId = setTimeout(() => { toast.classList.add('hidden'); }, 2500);
+}
+
+// Fungsi memunculkan overlay layar saat Game Over
+function showPlayerModal(playerObj, title, message) {
+    let modal = document.getElementById(`modal-p${playerObj}`);
+    if (modal) {
+        document.getElementById(`modal-p${playerObj}-title`).innerText = title;
+        document.getElementById(`modal-p${playerObj}-message`).innerText = message;
+        modal.classList.remove('hidden');
+        
+        let btn = document.getElementById(`btn-modal-p${playerObj}-ok`);
+        let newBtn = btn.cloneNode(true);
+        btn.parentNode.replaceChild(newBtn, btn);
+        newBtn.addEventListener('pointerdown', () => modal.classList.add('hidden'));
+    }
 }
 
 function triggerEffect(playerObj, type) {
@@ -69,7 +84,6 @@ function populateEntities(state) {
         let isDark = Math.random() > 0.5;
         let hpScale = state.stage * 5; let atkScale = state.stage * 2;
         
-        // Simpan Titik Asal (originX, originY) untuk AI kembali ke posisi awal
         state.monsters[`${cell.x},${cell.y}`] = isDark ? 
              { originX: cell.x, originY: cell.y, type: 'dark', emoji: '🧛', hp: 30+(diff*5)+hpScale, atk: 12+(diff*3)+atkScale, def: diff, name: 'Vampire' } : 
              { originX: cell.x, originY: cell.y, type: 'beast', emoji: '🐺', hp: 25+(diff*5)+hpScale, atk: 10+(diff*2)+atkScale, def: diff+2, name: 'Werewolf' };
@@ -91,10 +105,11 @@ function populateEntities(state) {
     for(let i=0; i<utilCount && emptyCells.length > 0; i++) { state.maze[emptyCells.pop().y][emptyCells.pop().x] = Math.random() > 0.5 ? 13 + Math.floor(Math.random() * 3) : 16 + Math.floor(Math.random() * 3); }
 }
 
-// AI MUSUH (Hanya jalan di atas Diff 3)
+// LOGIKA AI MUSUH (Bisa serang di semua diff, tapi hanya lari mengejar di diff > 3)
 function processEnemyAI(playerObj, state) {
     if (state.hp <= 0) return false;
     let newMonsters = {}; let playerAttacked = false; let changed = false; 
+    let diff = window.GameConfig.diff || 3;
     
     for (let key in state.monsters) {
         let m = state.monsters[key];
@@ -103,29 +118,41 @@ function processEnemyAI(playerObj, state) {
         let distToPlayer = Math.abs(state.x - mx) + Math.abs(state.y - my);
         let distToOrigin = Math.abs(m.originX - mx) + Math.abs(m.originY - my);
         
-        let aggroRange = 4;
-        let leashRange = 6; 
+        let aggroRange = 4; let leashRange = 6; 
         
-        // 1. Serang Duluan Jika Sebelahan
+        // 1. Serang Duluan Jika Sebelahan (Berlaku Semua Kesulitan)
         if (distToPlayer === 1) {
             let mAtk = m.atk;
             if(m.type === 'dark' && state.lightBuff === 0) mAtk += 15;
             let dmgToPlayer = Math.max(0, mAtk - state.def);
             
             state.hp -= dmgToPlayer;
-            showToast(playerObj, "AWAS!", `Diserang ${m.emoji} -${dmgToPlayer} HP.`);
             triggerEffect(playerObj, 'damage');
             
             playerAttacked = true; changed = true;
             newMonsters[`${mx},${my}`] = m;
             
             if (state.hp <= 0) {
-                state.hp = 0; window.CustomDialog.alert(`Player ${playerObj} tewas diserang ${m.name}.`, "GAME OVER");
-                window.isGameActive = false; break;
+                state.hp = 0; 
+                showPlayerModal(playerObj, "GAME OVER", `Kamu tewas diserang ${m.name}.`);
+                
+                // Cek jika KEDUA pemain tewas
+                let otherHp = playerObj == 1 ? p2State.hp : p1State.hp;
+                if(otherHp <= 0) {
+                    window.isGameActive = false;
+                    setTimeout(() => {
+                        window.CustomDialog.alert("Kedua pemain telah gugur!", "STAGE GAGAL", () => {
+                            document.getElementById('screen-game').classList.add('hidden');
+                            document.getElementById('screen-menu').classList.remove('hidden');
+                        });
+                    }, 1000);
+                }
+            } else {
+                showToast(playerObj, "AWAS!", `Diserang ${m.emoji} -${dmgToPlayer} HP.`);
             }
         }
-        // 2. Pemain Masuk Zona Aggro & Belum Lebihi Batas Pancingan (Leash) -> Kejar
-        else if (distToPlayer <= aggroRange && distToOrigin < leashRange) {
+        // 2. Kejar Pemain (Hanya Diff > 3)
+        else if (diff > 3 && distToPlayer <= aggroRange && distToOrigin < leashRange) {
             let dirs = [[0,-1], [0,1], [-1,0], [1,0]];
             dirs.sort((a, b) => {
                 let dA = Math.abs(state.x - (mx + a[0])) + Math.abs(state.y - (my + a[1]));
@@ -143,8 +170,8 @@ function processEnemyAI(playerObj, state) {
             }
             if (!moved) newMonsters[`${mx},${my}`] = m;
         }
-        // 3. Pemain Kabur ATAU Terlalu Jauh Dari Titik Asal -> Pulang (Return)
-        else if (distToOrigin > 0 && (distToPlayer > aggroRange || distToOrigin >= leashRange)) {
+        // 3. Kembali ke Titik Awal (Hanya Diff > 3)
+        else if (diff > 3 && distToOrigin > 0 && (distToPlayer > aggroRange || distToOrigin >= leashRange)) {
             let dirs = [[0,-1], [0,1], [-1,0], [1,0]];
             dirs.sort((a, b) => {
                 let dA = Math.abs(m.originX - (mx + a[0])) + Math.abs(m.originY - (my + a[1]));
@@ -162,8 +189,8 @@ function processEnemyAI(playerObj, state) {
             }
             if (!moved) newMonsters[`${mx},${my}`] = m;
         }
-        // 4. Idle Roaming (Jalan mondar-mandir secara acak jika nganggur)
-        else {
+        // 4. Diam Saja (Idle/Roaming)
+        else if (diff > 3) {
             if (Math.random() < 0.3) {
                 let dirs = [[0,-1], [0,1], [-1,0], [1,0]].sort(() => Math.random() - 0.5);
                 let moved = false;
@@ -176,9 +203,10 @@ function processEnemyAI(playerObj, state) {
                     }
                 }
                 if (!moved) newMonsters[`${mx},${my}`] = m;
-            } else {
-                newMonsters[`${mx},${my}`] = m;
-            }
+            } else newMonsters[`${mx},${my}`] = m;
+        } else {
+            // Jika Diff <= 3, monster diam selamanya sampai didekati
+            newMonsters[`${mx},${my}`] = m;
         }
     }
     state.monsters = newMonsters;
@@ -223,14 +251,12 @@ function initGame(p1Name, p2Name) {
         }
     }, 1000);
     
-    // Interval AI Musuh (Jalan tiap 1 detik)
+    // Interval AI selalu jalan (agar diff rendah bisa nyerang kalau bersentuhan)
     enemyInterval = setInterval(() => {
         if (!window.isGameActive) return;
-        if (diff > 3) {
-            let redraw1 = processEnemyAI(1, p1State);
-            let redraw2 = processEnemyAI(2, p2State);
-            if (redraw1 || redraw2) requestAnimationFrame(drawGame);
-        }
+        let redraw1 = processEnemyAI(1, p1State);
+        let redraw2 = processEnemyAI(2, p2State);
+        if (redraw1 || redraw2) requestAnimationFrame(drawGame);
     }, 1000); 
 
     function resizeCanvas() {
@@ -281,8 +307,12 @@ function grabItem(playerObj) {
     let state = playerObj == 1 ? p1State : p2State;
     let cell = state.maze[state.y][state.x];
     
+    let diff = window.GameConfig.diff || 3;
+    // Kapasitas tas menyusut di kesulitan tinggi (Max: 7 di diff 1, Min: 3 di diff 5)
+    let maxInv = Math.max(3, 8 - diff); 
+    
     if (cell === 2 || (cell >= 10 && cell <= 23)) {
-        if(state.inventory.length >= 6) { showToast(playerObj, "TAS PENUH", "Maksimal 6 barang!"); return; }
+        if(state.inventory.length >= maxInv) { showToast(playerObj, "TAS PENUH", `Maksimal ${maxInv} barang!`); return; }
         
         let itemName = "";
         if (cell === 2) { state.inventory.push('key'); state.hasKey = true; itemName = "Kunci Emas 🔑"; }
@@ -317,10 +347,7 @@ function useItem(playerObj, itemIndex) {
         
         if (item.type === 'atk') state.atk += item.val;
         if (item.type === 'def') state.def += item.val;
-        if (item.type === 'util' && item.utilType === 'light') {
-            state.lightBuff++;
-            if(item.defBonus) state.def += item.defBonus;
-        }
+        if (item.type === 'util' && item.utilType === 'light') { state.lightBuff++; if(item.defBonus) state.def += item.defBonus; }
         
         showToast(playerObj, "BUFF", `${item.name} aktif!`);
         
@@ -337,7 +364,7 @@ function useItem(playerObj, itemIndex) {
     updateStatsUI(playerObj); drawGame();
 }
 
-// Fitur Serang Manual Pemain
+// Tombol Serang Manual
 function attackEnemy(playerObj) {
     let state = playerObj == 1 ? p1State : p2State;
     if (!window.isGameActive || state.hp <= 0) return;
@@ -346,11 +373,12 @@ function attackEnemy(playerObj) {
     for (let key in state.monsters) {
         let [mx, my] = key.split(',').map(Number);
         let dist = Math.abs(state.x - mx) + Math.abs(state.y - my);
+        // Serang monster yang ada persis di sebelah
         if (dist === 1) { targetKey = key; break; }
     }
 
     if (targetKey) {
-        triggerEffect(playerObj, 'attack'); // Efek Serangan
+        triggerEffect(playerObj, 'attack'); 
         let monster = state.monsters[targetKey];
         let pAtk = state.atk;
         if (monster.type === 'dark' && state.lightBuff > 0) pAtk += 20;
@@ -366,6 +394,7 @@ function attackEnemy(playerObj) {
             showToast(playerObj, "MENANG!", `${monster.emoji} hancur!`);
         } else {
             showToast(playerObj, "SERANG!", `Kena! -${dmgToMonster} HP.`);
+            // Serangan balik otomatis diurus oleh Interval prosesEnemyAI
         }
         updateStatsUI(playerObj); drawGame();
     } else {
@@ -385,7 +414,7 @@ function movePlayer(playerObj, dir) {
         let targetCell = state.maze[nextY][nextX];
         if (targetCell !== 1) { 
             if (targetCell === 4) {
-                // Mendorong musuh = Menyerang
+                // Menabrak monster juga berarti memicu serangan
                 attackEnemy(playerObj); 
             } else if (targetCell === 3) {
                 if (state.hasKey) {
