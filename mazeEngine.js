@@ -48,17 +48,34 @@ function renderMaze(ctx, maze, width, height, theme, pState) {
     const cellSize = Math.min(ctx.canvas.width / width, ctx.canvas.height / height);
     const offsetX = (ctx.canvas.width - (cellSize * width)) / 2;
     const offsetY = (ctx.canvas.height - (cellSize * height)) / 2;
-    ctx.textAlign = "center"; ctx.textBaseline = "middle";
     
+    // 1. Gambar Seluruh Lantai Dasar (Hitam/Abu Gelap)
+    ctx.fillStyle = '#222';
+    ctx.fillRect(offsetX, offsetY, width * cellSize, height * cellSize);
+
+    // 2. Gambar Zona Jangkauan Monster (Hanya untuk Diff > 3)
+    let diff = window.GameConfig ? window.GameConfig.diff : 3;
+    if (diff > 3 && pState && pState.monsters) {
+        ctx.fillStyle = 'rgba(231, 76, 60, 0.15)'; // Merah transparan
+        for (let key in pState.monsters) {
+            let [mx, my] = key.split(',').map(Number);
+            let mCenterX = offsetX + (mx * cellSize) + (cellSize / 2);
+            let mCenterY = offsetY + (my * cellSize) + (cellSize / 2);
+            
+            ctx.beginPath();
+            // Jangkauan aggro radius 4.5 sel agar pas menutupi 4 blok di sekitarnya
+            ctx.arc(mCenterX, mCenterY, 4.5 * cellSize, 0, Math.PI * 2); 
+            ctx.fill();
+        }
+    }
+
+    // 3. Gambar Tembok dan Entitas
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
     for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
             let drawX = offsetX + (x * cellSize); let drawY = offsetY + (y * cellSize);
             let centerX = drawX + (cellSize / 2); let centerY = drawY + (cellSize / 2);
             
-            if (maze[y][x] !== 1) {
-                ctx.fillStyle = '#222';
-                ctx.fillRect(drawX, drawY, Math.ceil(cellSize), Math.ceil(cellSize));
-            }
             if (maze[y][x] === 1) { // Tembok
                 ctx.fillStyle = theme === 'jungle' ? '#228B22' : '#5D4037';
                 ctx.fillRect(drawX, drawY, Math.ceil(cellSize), Math.ceil(cellSize));

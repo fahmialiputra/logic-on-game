@@ -1,22 +1,15 @@
-// gameLogic.js - RPG Stats, Database Item, Spacing Algoritma, Durasi Buff, Toast & Combat AI
+// gameLogic.js - RPG Stats, Database Item, AI Aggro & Roaming, Efek Visual
 
 window.ITEM_DB = {
-    // ATK BUFFS (ID 10-12)
     10: { name: 'Pedang Kayu', emoji: '🗡️', type: 'atk', val: 10, dur: 15 },
     11: { name: 'Dua Pedang', emoji: '⚔️', type: 'atk', val: 18, dur: 20 },
     12: { name: 'Pedang Emas', emoji: '🔱', type: 'atk', val: 30, dur: 25 },
-    
-    // UTILITY / ANTI-DARK (ID 13-15)
     13: { name: '3 Lilin', emoji: '🕯️', type: 'util', utilType: 'light', dur: 15 },
     14: { name: 'Obor', emoji: '🔥', type: 'util', utilType: 'light', dur: 25 },
     15: { name: 'Jubah Anti-Vampir', emoji: '🧥', type: 'util', utilType: 'light', defBonus: 5, dur: 30 },
-    
-    // DEF BUFFS (ID 16-18)
     16: { name: 'Perisai Kayu', emoji: '🪵', type: 'def', val: 5, dur: 15 },
     17: { name: 'Baju Armor', emoji: '🦺', type: 'def', val: 12, dur: 25 },
     18: { name: 'Perisai Besi', emoji: '🛡️', type: 'def', val: 20, dur: 30 },
-    
-    // HEALS (ID 19-23)
     19: { name: 'Apel', emoji: '🍎', type: 'heal', val: 20 },
     20: { name: 'Jus Buah', emoji: '🧃', type: 'heal', val: 35 },
     21: { name: 'Daging Sapi', emoji: '🥩', type: 'heal', val: 50 },
@@ -25,11 +18,9 @@ window.ITEM_DB = {
 };
 
 let p1State = {}; let p2State = {};
-let gameInterval;
-let enemyInterval; // Interval khusus untuk pergerakan AI Musuh
+let gameInterval; let enemyInterval;
 window.isGameActive = false;
 
-// Fungsi Menampilkan Notifikasi Toast
 function showToast(playerObj, title, message) {
     let toast = document.getElementById(`toast-p${playerObj}`);
     document.getElementById(`toast-p${playerObj}-title`).innerText = title;
@@ -40,22 +31,17 @@ function showToast(playerObj, title, message) {
     toast.timeoutId = setTimeout(() => { toast.classList.add('hidden'); }, 2500);
 }
 
-// Fungsi Memicu Efek Visual (Guncangan / Cahaya)
 function triggerEffect(playerObj, type) {
     let screen = document.getElementById(`p${playerObj}-screen`);
     if(!screen) return;
-    
-    // Hapus kelas efek sebelumnya agar animasi bisa ter-reset jika terjadi beruntun
     screen.classList.remove('effect-damage', 'effect-heal', 'effect-buff', 'effect-attack');
-    void screen.offsetWidth; // Memaksa perenderan ulang (reflow) DOM
-    
+    void screen.offsetWidth; // Force reflow
     screen.classList.add(`effect-${type}`);
-    setTimeout(() => { screen.classList.remove(`effect-${type}`); }, 400); // Bersihkan kelas
+    setTimeout(() => { screen.classList.remove(`effect-${type}`); }, 400); 
 }
 
 function populateEntities(state) {
-    state.monsters = {};
-    let emptyCells = [];
+    state.monsters = {}; let emptyCells = [];
     
     for(let y=1; y<state.size-1; y++) {
         for(let x=1; x<state.size-1; x++) {
@@ -65,31 +51,28 @@ function populateEntities(state) {
     emptyCells.sort(() => Math.random() - 0.5);
     
     let diff = window.GameConfig.diff || 3;
-    
     let monsterCount = Math.floor(state.size / 4) + diff; 
     let safeDistFromPlayer = 4 + diff; 
-    let safeDistBetweenMonsters = 3;   
     let placedMonsters = [];
 
     for(let i = emptyCells.length - 1; i >= 0 && placedMonsters.length < monsterCount; i--) {
         let cell = emptyCells[i];
-        
         let distToPlayer = Math.abs(cell.x - 1) + Math.abs(cell.y - 1);
         if (distToPlayer < safeDistFromPlayer) continue;
 
-        let isTooClose = placedMonsters.some(m => (Math.abs(m.x - cell.x) + Math.abs(m.y - cell.y)) < safeDistBetweenMonsters);
+        let isTooClose = placedMonsters.some(m => (Math.abs(m.x - cell.x) + Math.abs(m.y - cell.y)) < 3);
         if (isTooClose) continue;
 
         state.maze[cell.y][cell.x] = 4; 
         placedMonsters.push(cell);
         
         let isDark = Math.random() > 0.5;
-        let hpScale = state.stage * 5; 
-        let atkScale = state.stage * 2;
+        let hpScale = state.stage * 5; let atkScale = state.stage * 2;
         
+        // Simpan Titik Asal (originX, originY) untuk AI kembali ke posisi awal
         state.monsters[`${cell.x},${cell.y}`] = isDark ? 
-             { type: 'dark', emoji: '🧛', hp: 30+(diff*5)+hpScale, atk: 12+(diff*3)+atkScale, def: diff, name: 'Vampire' } : 
-             { type: 'beast', emoji: '🐺', hp: 25+(diff*5)+hpScale, atk: 10+(diff*2)+atkScale, def: diff+2, name: 'Werewolf' };
+             { originX: cell.x, originY: cell.y, type: 'dark', emoji: '🧛', hp: 30+(diff*5)+hpScale, atk: 12+(diff*3)+atkScale, def: diff, name: 'Vampire' } : 
+             { originX: cell.x, originY: cell.y, type: 'beast', emoji: '🐺', hp: 25+(diff*5)+hpScale, atk: 10+(diff*2)+atkScale, def: diff+2, name: 'Werewolf' };
              
         emptyCells.splice(i, 1);
     }
@@ -104,35 +87,27 @@ function populateEntities(state) {
         let id = diff >= 4 ? (19 + Math.floor(Math.random() * 2)) : (diff === 3 ? (19 + Math.floor(Math.random() * 3)) : (20 + Math.floor(Math.random() * 4)));
         state.maze[c.y][c.x] = id; 
     }
-    
-    for(let i=0; i<weaponCount && emptyCells.length > 0; i++) {
-        let c = emptyCells.pop();
-        state.maze[c.y][c.x] = 10 + Math.floor(Math.random() * 3);
-    }
-    
-    for(let i=0; i<utilCount && emptyCells.length > 0; i++) {
-        let c = emptyCells.pop();
-        state.maze[c.y][c.x] = Math.random() > 0.5 ? 13 + Math.floor(Math.random() * 3) : 16 + Math.floor(Math.random() * 3);
-    }
+    for(let i=0; i<weaponCount && emptyCells.length > 0; i++) { state.maze[emptyCells.pop().y][emptyCells.pop().x] = 10 + Math.floor(Math.random() * 3); }
+    for(let i=0; i<utilCount && emptyCells.length > 0; i++) { state.maze[emptyCells.pop().y][emptyCells.pop().x] = Math.random() > 0.5 ? 13 + Math.floor(Math.random() * 3) : 16 + Math.floor(Math.random() * 3); }
 }
 
-// LOGIKA AI MUSUH (Hanya aktif jika Diff > 3)
+// AI MUSUH (Hanya jalan di atas Diff 3)
 function processEnemyAI(playerObj, state) {
     if (state.hp <= 0) return false;
-    
-    let newMonsters = {};
-    let playerAttacked = false;
-    let changed = false; 
+    let newMonsters = {}; let playerAttacked = false; let changed = false; 
     
     for (let key in state.monsters) {
         let m = state.monsters[key];
         let [mx, my] = key.split(',').map(Number);
         
-        // Cek Jarak (Manhattan Distance) ke Pemain
-        let dist = Math.abs(state.x - mx) + Math.abs(state.y - my);
+        let distToPlayer = Math.abs(state.x - mx) + Math.abs(state.y - my);
+        let distToOrigin = Math.abs(m.originX - mx) + Math.abs(m.originY - my);
         
-        if (dist === 1) { 
-            // Aggro! Musuh berada di sebelah pemain, Musuh menyerang duluan
+        let aggroRange = 4;
+        let leashRange = 6; 
+        
+        // 1. Serang Duluan Jika Sebelahan
+        if (distToPlayer === 1) {
             let mAtk = m.atk;
             if(m.type === 'dark' && state.lightBuff === 0) mAtk += 15;
             let dmgToPlayer = Math.max(0, mAtk - state.def);
@@ -142,41 +117,68 @@ function processEnemyAI(playerObj, state) {
             triggerEffect(playerObj, 'damage');
             
             playerAttacked = true; changed = true;
-            newMonsters[`${mx},${my}`] = m; // Musuh tetap di tempatnya saat menyerang
+            newMonsters[`${mx},${my}`] = m;
             
             if (state.hp <= 0) {
-                state.hp = 0;
-                window.CustomDialog.alert(`Player ${playerObj} tewas diserang ${m.name}.`, "GAME OVER");
-                window.isGameActive = false;
-                break;
+                state.hp = 0; window.CustomDialog.alert(`Player ${playerObj} tewas diserang ${m.name}.`, "GAME OVER");
+                window.isGameActive = false; break;
             }
-        } else if (dist <= 4 && dist > 1) { 
-            // AI Mengejar Pemain Jika di area pantauan (Jarak 2-4)
+        }
+        // 2. Pemain Masuk Zona Aggro & Belum Lebihi Batas Pancingan (Leash) -> Kejar
+        else if (distToPlayer <= aggroRange && distToOrigin < leashRange) {
             let dirs = [[0,-1], [0,1], [-1,0], [1,0]];
-            
-            // Urutkan gerakan berdasarkan yang paling mendekatkan ke pemain
             dirs.sort((a, b) => {
-                let distA = Math.abs(state.x - (mx + a[0])) + Math.abs(state.y - (my + a[1]));
-                let distB = Math.abs(state.x - (mx + b[0])) + Math.abs(state.y - (my + b[1]));
-                return distA - distB; 
+                let dA = Math.abs(state.x - (mx + a[0])) + Math.abs(state.y - (my + a[1]));
+                let dB = Math.abs(state.x - (mx + b[0])) + Math.abs(state.y - (my + b[1]));
+                return dA - dB; 
             });
 
             let moved = false;
             for (let d of dirs) {
                 let nx = mx + d[0]; let ny = my + d[1];
-                // Syarat gerak: Grid kosong (0) dan tidak ada monster lain di sana
                 if (state.maze[ny][nx] === 0 && !newMonsters[`${nx},${ny}`]) {
-                    state.maze[my][mx] = 0; 
-                    state.maze[ny][nx] = 4;
-                    newMonsters[`${nx},${ny}`] = m;
-                    moved = true; changed = true;
-                    break;
+                    state.maze[my][mx] = 0; state.maze[ny][nx] = 4;
+                    newMonsters[`${nx},${ny}`] = m; moved = true; changed = true; break;
                 }
             }
-            if (!moved) newMonsters[`${mx},${my}`] = m; // Terjebak
-        } else {
-            // Pemain di luar area, musuh diam
-            newMonsters[`${mx},${my}`] = m;
+            if (!moved) newMonsters[`${mx},${my}`] = m;
+        }
+        // 3. Pemain Kabur ATAU Terlalu Jauh Dari Titik Asal -> Pulang (Return)
+        else if (distToOrigin > 0 && (distToPlayer > aggroRange || distToOrigin >= leashRange)) {
+            let dirs = [[0,-1], [0,1], [-1,0], [1,0]];
+            dirs.sort((a, b) => {
+                let dA = Math.abs(m.originX - (mx + a[0])) + Math.abs(m.originY - (my + a[1]));
+                let dB = Math.abs(m.originX - (mx + b[0])) + Math.abs(m.originY - (my + b[1]));
+                return dA - dB; 
+            });
+
+            let moved = false;
+            for (let d of dirs) {
+                let nx = mx + d[0]; let ny = my + d[1];
+                if (state.maze[ny][nx] === 0 && !newMonsters[`${nx},${ny}`]) {
+                    state.maze[my][mx] = 0; state.maze[ny][nx] = 4;
+                    newMonsters[`${nx},${ny}`] = m; moved = true; changed = true; break;
+                }
+            }
+            if (!moved) newMonsters[`${mx},${my}`] = m;
+        }
+        // 4. Idle Roaming (Jalan mondar-mandir secara acak jika nganggur)
+        else {
+            if (Math.random() < 0.3) {
+                let dirs = [[0,-1], [0,1], [-1,0], [1,0]].sort(() => Math.random() - 0.5);
+                let moved = false;
+                for (let d of dirs) {
+                    let nx = mx + d[0]; let ny = my + d[1];
+                    let distToOrig = Math.abs(m.originX - nx) + Math.abs(m.originY - ny);
+                    if (distToOrig <= 2 && state.maze[ny][nx] === 0 && !newMonsters[`${nx},${ny}`]) {
+                        state.maze[my][mx] = 0; state.maze[ny][nx] = 4;
+                        newMonsters[`${nx},${ny}`] = m; moved = true; changed = true; break;
+                    }
+                }
+                if (!moved) newMonsters[`${mx},${my}`] = m;
+            } else {
+                newMonsters[`${mx},${my}`] = m;
+            }
         }
     }
     state.monsters = newMonsters;
@@ -199,9 +201,7 @@ function initGame(p1Name, p2Name) {
     populateEntities(p1State); populateEntities(p2State);
     updateStatsUI(1); updateStatsUI(2);
     
-    clearInterval(gameInterval); 
-    clearInterval(enemyInterval);
-    
+    clearInterval(gameInterval); clearInterval(enemyInterval);
     let timeRemaining = (window.GameConfig.timer || 2) * 60; 
     window.isGameActive = true;
     
@@ -223,7 +223,7 @@ function initGame(p1Name, p2Name) {
         }
     }, 1000);
     
-    // Interval AI: Dijalankan setiap 1 detik jika Difficulty > 3
+    // Interval AI Musuh (Jalan tiap 1 detik)
     enemyInterval = setInterval(() => {
         if (!window.isGameActive) return;
         if (diff > 3) {
@@ -255,7 +255,6 @@ function updateStatsUI(playerObj) {
     
     let invContainer = document.getElementById(`inv-list-p${playerObj}`);
     invContainer.innerHTML = '';
-    
     if (state.inventory.length === 0) {
         invContainer.innerHTML = '<p style="color:#aaa; width:100%; text-align:center;">Tas Kosong</p>';
     } else {
@@ -264,12 +263,8 @@ function updateStatsUI(playerObj) {
             btn.className = 'inv-item-btn action-use-item';
             btn.dataset.player = playerObj;
             btn.dataset.index = index;
-            
             if(itemId === 'key') btn.innerHTML = `🔑<br><small>Kunci Keluar</small>`;
-            else {
-                let d = window.ITEM_DB[itemId];
-                btn.innerHTML = `${d.emoji}<br><small>${d.name}</small>`;
-            }
+            else btn.innerHTML = `${window.ITEM_DB[itemId].emoji}<br><small>${window.ITEM_DB[itemId].name}</small>`;
             invContainer.appendChild(btn);
         });
     }
@@ -287,23 +282,17 @@ function grabItem(playerObj) {
     let cell = state.maze[state.y][state.x];
     
     if (cell === 2 || (cell >= 10 && cell <= 23)) {
-        if(state.inventory.length >= 6) {
-            showToast(playerObj, "TAS PENUH", "Maksimal 6 barang!"); return;
-        }
+        if(state.inventory.length >= 6) { showToast(playerObj, "TAS PENUH", "Maksimal 6 barang!"); return; }
         
         let itemName = "";
         if (cell === 2) { state.inventory.push('key'); state.hasKey = true; itemName = "Kunci Emas 🔑"; }
-        else { 
-            state.inventory.push(cell); 
-            itemName = `${window.ITEM_DB[cell].emoji} ${window.ITEM_DB[cell].name}`;
-        }
+        else { state.inventory.push(cell); itemName = `${window.ITEM_DB[cell].emoji} ${window.ITEM_DB[cell].name}`; }
         
         state.maze[state.y][state.x] = 0; state.score += 15;
-        showToast(playerObj, "AMBIL ITEM", `${itemName} masuk tas.`);
+        triggerEffect(playerObj, 'buff');
+        showToast(playerObj, "AMBIL", `${itemName} masuk tas.`);
         updateStatsUI(playerObj); drawGame();
-    } else {
-        showToast(playerObj, "KOSONG", "Tidak ada item di bawahmu.");
-    }
+    } else showToast(playerObj, "KOSONG", "Tidak ada item di bawahmu.");
 }
 
 function useItem(playerObj, itemIndex) {
@@ -311,9 +300,7 @@ function useItem(playerObj, itemIndex) {
     let itemId = state.inventory[itemIndex];
     if (!itemId) return;
     
-    if (itemId === 'key') {
-        showToast(playerObj, "INFO", "Tabrak pintu untuk pakai kunci otomatis."); return;
-    }
+    if (itemId === 'key') { showToast(playerObj, "INFO", "Tabrak pintu otomatis pakai kunci."); return; }
     
     let item = window.ITEM_DB[itemId];
     state.inventory.splice(itemIndex, 1);
@@ -321,12 +308,12 @@ function useItem(playerObj, itemIndex) {
     
     if(item.type === 'heal') {
         state.hp = Math.min(200, state.hp + item.val);
-        triggerEffect(playerObj, 'heal'); // Panggil Efek Visual
+        triggerEffect(playerObj, 'heal'); 
         showToast(playerObj, "HEAL", `Gluk! +${item.val} HP.`);
     } else {
         let buffObj = { id: item.id, emoji: item.emoji };
         state.activeBuffs.push(buffObj);
-        triggerEffect(playerObj, 'buff'); // Panggil Efek Visual
+        triggerEffect(playerObj, 'buff'); 
         
         if (item.type === 'atk') state.atk += item.val;
         if (item.type === 'def') state.def += item.val;
@@ -335,23 +322,55 @@ function useItem(playerObj, itemIndex) {
             if(item.defBonus) state.def += item.defBonus;
         }
         
-        showToast(playerObj, "BUFF AKTIF", `${item.name} aktif selama ${item.dur} detik!`);
+        showToast(playerObj, "BUFF", `${item.name} aktif!`);
         
         setTimeout(() => {
             if (item.type === 'atk') state.atk -= item.val;
             if (item.type === 'def') state.def -= item.val;
-            if (item.type === 'util' && item.utilType === 'light') {
-                state.lightBuff--;
-                if(item.defBonus) state.def -= item.defBonus;
-            }
-            
+            if (item.type === 'util' && item.utilType === 'light') { state.lightBuff--; if(item.defBonus) state.def -= item.defBonus; }
             let idx = state.activeBuffs.indexOf(buffObj);
             if (idx > -1) state.activeBuffs.splice(idx, 1);
-            showToast(playerObj, "BUFF HABIS", `Efek ${item.name} telah selesai.`);
+            showToast(playerObj, "HABIS", `Efek ${item.name} selesai.`);
             updateStatsUI(playerObj);
         }, item.dur * 1000);
     }
     updateStatsUI(playerObj); drawGame();
+}
+
+// Fitur Serang Manual Pemain
+function attackEnemy(playerObj) {
+    let state = playerObj == 1 ? p1State : p2State;
+    if (!window.isGameActive || state.hp <= 0) return;
+
+    let targetKey = null;
+    for (let key in state.monsters) {
+        let [mx, my] = key.split(',').map(Number);
+        let dist = Math.abs(state.x - mx) + Math.abs(state.y - my);
+        if (dist === 1) { targetKey = key; break; }
+    }
+
+    if (targetKey) {
+        triggerEffect(playerObj, 'attack'); // Efek Serangan
+        let monster = state.monsters[targetKey];
+        let pAtk = state.atk;
+        if (monster.type === 'dark' && state.lightBuff > 0) pAtk += 20;
+
+        let dmgToMonster = Math.max(1, pAtk - monster.def);
+        monster.hp -= dmgToMonster;
+
+        if (monster.hp <= 0) {
+            let [mx, my] = targetKey.split(',').map(Number);
+            state.maze[my][mx] = 0;
+            delete state.monsters[targetKey];
+            state.score += 150;
+            showToast(playerObj, "MENANG!", `${monster.emoji} hancur!`);
+        } else {
+            showToast(playerObj, "SERANG!", `Kena! -${dmgToMonster} HP.`);
+        }
+        updateStatsUI(playerObj); drawGame();
+    } else {
+        showToast(playerObj, "KOSONG", "Tidak ada musuh di dekatmu!");
+    }
 }
 
 function movePlayer(playerObj, dir) {
@@ -366,39 +385,8 @@ function movePlayer(playerObj, dir) {
         let targetCell = state.maze[nextY][nextX];
         if (targetCell !== 1) { 
             if (targetCell === 4) {
-                // Pemain Menyerang Monster Secara Manual (Bump)
-                triggerEffect(playerObj, 'attack'); // Efek Animasi
-                
-                let monster = state.monsters[`${nextX},${nextY}`];
-                if(monster) {
-                    let pAtk = state.atk; let mAtk = monster.atk;
-                    if(monster.type === 'dark' && state.lightBuff === 0) mAtk += 15; 
-                    else if(monster.type === 'dark' && state.lightBuff > 0) pAtk += 20; 
-                    
-                    let dmgToMonster = Math.max(1, pAtk - monster.def);
-                    let dmgToPlayer = Math.max(0, mAtk - state.def);
-                    
-                    monster.hp -= dmgToMonster;
-                    
-                    if(monster.hp > 0) {
-                        state.hp -= dmgToPlayer;
-                        // Serang Balik
-                        triggerEffect(playerObj, 'damage');
-                        showToast(playerObj, "BENTROK!", `Diserang balik! -${dmgToPlayer} HP.`);
-                    } else {
-                        state.hp -= dmgToPlayer; 
-                        state.maze[nextY][nextX] = 0; 
-                        delete state.monsters[`${nextX},${nextY}`];
-                        state.score += 150;
-                        showToast(playerObj, "MENANG!", `${monster.emoji} hancur!`);
-                        state.x = nextX; state.y = nextY;
-                    }
-                    if(state.hp <= 0) {
-                        state.hp = 0;
-                        window.CustomDialog.alert(`Player ${playerObj} telah gugur dalam labirin.`, "MATI");
-                        window.isGameActive = false;
-                    }
-                }
+                // Mendorong musuh = Menyerang
+                attackEnemy(playerObj); 
             } else if (targetCell === 3) {
                 if (state.hasKey) {
                     showToast(playerObj, "STAGE CLEAR!", `Mantap! Naik level.`);
@@ -411,9 +399,7 @@ function movePlayer(playerObj, dir) {
                     state.hasKey = false;
                     
                     populateEntities(state);
-                } else {
-                    showToast(playerObj, "TERKUNCI", "Pintu keluar butuh kunci emas 🔑.");
-                }
+                } else showToast(playerObj, "TERKUNCI", "Butuh kunci emas 🔑.");
             } else {
                 state.x = nextX; state.y = nextY;
             }
@@ -424,12 +410,13 @@ function movePlayer(playerObj, dir) {
 
 document.addEventListener('pointerdown', (e) => {
     if (!window.isGameActive) return;
-    let btn = e.target.closest('.dpad-btn, .action-grab, .action-inv, .action-use-item');
+    let btn = e.target.closest('.dpad-btn, .action-grab, .action-inv, .action-use-item, .action-attack');
     if (!btn) return;
     e.preventDefault();
     
     const player = btn.dataset.player;
     if (btn.classList.contains('action-grab')) grabItem(player);
+    else if (btn.classList.contains('action-attack')) attackEnemy(player);
     else if (btn.classList.contains('action-inv')) document.getElementById(`inv-p${player}`).classList.toggle('hidden');
     else if (btn.classList.contains('action-use-item')) useItem(player, btn.dataset.index);
     else {
