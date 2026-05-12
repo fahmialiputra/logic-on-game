@@ -1,4 +1,4 @@
-// gameLogic.js - RPG Stats, Database Item, AI Aggro & Roaming Lokal, Efek Visual
+// gameLogic.js - Clean Version (Optimized Movement & Combat AI)
 
 window.ITEM_DB = {
     10: { name: 'Pedang Kayu', emoji: '🗡️', type: 'atk', val: 10, dur: 15 },
@@ -17,47 +17,124 @@ window.ITEM_DB = {
     23: { name: 'Obat', emoji: '💊', type: 'heal', val: 100 }
 };
 
-let p1State = {}; let p2State = {};
+window.p1State = {}; window.p2State = {};
 let gameInterval; let enemyInterval;
 window.isGameActive = false;
 
+let joysticks = {
+    1: { dx: 0, dy: 0, active: false, pad: 'analog-1', knob: 'knob-1' },
+    2: { dx: 0, dy: 0, active: false, pad: 'analog-2', knob: 'knob-2' }
+};
+
 function showToast(playerObj, title, message) {
     let toast = document.getElementById(`toast-p${playerObj}`);
-    document.getElementById(`toast-p${playerObj}-title`).innerText = title;
+    document.getElementById(`toast-p${playerObj}-title`).innerText = title + ":";
     document.getElementById(`toast-p${playerObj}-msg`).innerText = message;
     
     toast.classList.remove('hidden');
     if(toast.timeoutId) clearTimeout(toast.timeoutId);
-    toast.timeoutId = setTimeout(() => { toast.classList.add('hidden'); }, 2500);
+    toast.timeoutId = setTimeout(() => { toast.classList.add('hidden'); }, 2000);
 }
 
-// Fungsi memunculkan overlay layar saat Game Over
-function showPlayerModal(playerObj, title, message) {
-    let modal = document.getElementById(`modal-p${playerObj}`);
-    if (modal) {
-        document.getElementById(`modal-p${playerObj}-title`).innerText = title;
-        document.getElementById(`modal-p${playerObj}-message`).innerText = message;
-        modal.classList.remove('hidden');
+function saveToLeaderboard(name, score, stage) {
+    if (score === 0) return; 
+    let lbData = JSON.parse(localStorage.getItem('logicGameLB') || '[]');
+    lbData.push({ name: name, score: score, stage: stage });
+    localStorage.setItem('logicGameLB', JSON.stringify(lbData));
+}
+
+function triggerGameOver() {
+    window.isGameActive = false;
+    clearInterval(gameInterval); clearInterval(enemyInterval);
+    
+    let n1 = window.p1State.name; let s1 = window.p1State.score;
+    let n2 = window.p2State.name; let s2 = window.p2State.score;
+    
+    let winnerText = "DRAW!";
+    if (s1 > s2) winnerText = `${n1} WIN!`;
+    else if (s2 > s1) winnerText = `${n2} WIN!`;
+
+    document.getElementById('gameover-winner').innerText = winnerText;
+    
+    document.getElementById('go-p1-name').innerText = n1;
+    document.getElementById('go-p1-score').innerText = s1;
+    document.getElementById('go-p1-stage').innerText = window.p1State.stage;
+    document.getElementById('go-p1-kills').innerText = window.p1State.stats.kills;
+    document.getElementById('go-p1-dmgDealt').innerText = window.p1State.stats.dmgDealt;
+    document.getElementById('go-p1-dmgTaken').innerText = window.p1State.stats.dmgTaken;
+
+    document.getElementById('go-p2-name').innerText = n2;
+    document.getElementById('go-p2-score').innerText = s2;
+    document.getElementById('go-p2-stage').innerText = window.p2State.stage;
+    document.getElementById('go-p2-kills').innerText = window.p2State.stats.kills;
+    document.getElementById('go-p2-dmgDealt').innerText = window.p2State.stats.dmgDealt;
+    document.getElementById('go-p2-dmgTaken').innerText = window.p2State.stats.dmgTaken;
+
+    saveToLeaderboard(n1, s1, window.p1State.stage);
+    saveToLeaderboard(n2, s2, window.p2State.stage);
+
+    document.getElementById('screen-game').classList.add('hidden');
+    document.getElementById('custom-modal').classList.add('hidden'); 
+    document.getElementById('screen-gameover').classList.remove('hidden');
+}
+
+function checkDeath(playerObj, state, killerName) {
+    if (state.hp <= 0 && !state.isDead) {
+        let diff = window.GameConfig.diff || 3;
+        let hasHeal = state.inventory.some(id => id !== 'key' && window.ITEM_DB[id].type === 'heal');
         
-        let btn = document.getElementById(`btn-modal-p${playerObj}-ok`);
-        let newBtn = btn.cloneNode(true);
-        btn.parentNode.replaceChild(newBtn, btn);
-        newBtn.addEventListener('pointerdown', () => modal.classList.add('hidden'));
+        if (diff < 4 && hasHeal && !state.isPaused) {
+            state.hp = 1; state.isPaused = true; 
+            showToast(playerObj, "KRITIS!", "Game dijeda! Gunakan penyembuh!");
+            document.getElementById(`inv-p${playerObj}`).classList.remove('hidden'); 
+            updateStatsUI(playerObj);
+            return false; 
+        }
+        
+        state.hp = 0; state.isDead = true; 
+
+        let overlay = document.getElementById(`dead-overlay-p${playerObj}`);
+        if(overlay) overlay.classList.remove('hidden');
+
+        showToast(playerObj, "GUGUR", `Tewas oleh ${killerName}`);
+        
+        let otherHp = playerObj == 1 ? window.p2State.hp : window.p1State.hp;
+        if(otherHp <= 0) setTimeout(triggerGameOver, 2000); 
+
+        return true; 
     }
+    return state.isDead;
 }
 
 function triggerEffect(playerObj, type) {
     let screen = document.getElementById(`p${playerObj}-screen`);
     if(!screen) return;
     screen.classList.remove('effect-damage', 'effect-heal', 'effect-buff', 'effect-attack');
-    void screen.offsetWidth; // Force reflow
+    void screen.offsetWidth; 
     screen.classList.add(`effect-${type}`);
     setTimeout(() => { screen.classList.remove(`effect-${type}`); }, 400); 
 }
 
+function addVisualEffect(state, x, y, emoji, type = 'normal') {
+    state.effects.push({ x: x, y: y, emoji: emoji, life: 1.0, type: type });
+}
+
+function handleStageClear(playerObj, state) {
+    showToast(playerObj, "STAGE CLEAR!", `Naik level!`);
+    state.score += 300; state.stage += 1; state.size += 2; 
+    state.maze = generateMaze(state.size, state.size);
+    state.x = 1; state.y = 1; state.visualX = 1; state.visualY = 1;
+    
+    let keyIdx = state.inventory.indexOf('key');
+    if (keyIdx > -1) state.inventory.splice(keyIdx, 1);
+    state.hasKey = false;
+    
+    populateEntities(state);
+    updateStatsUI(playerObj);
+}
+
 function populateEntities(state) {
     state.monsters = {}; let emptyCells = [];
-    
     for(let y=1; y<state.size-1; y++) {
         for(let x=1; x<state.size-1; x++) {
             if(state.maze[y][x] === 0 && !(x === 1 && y === 1)) emptyCells.push({x, y});
@@ -78,15 +155,13 @@ function populateEntities(state) {
         let isTooClose = placedMonsters.some(m => (Math.abs(m.x - cell.x) + Math.abs(m.y - cell.y)) < 3);
         if (isTooClose) continue;
 
-        state.maze[cell.y][cell.x] = 4; 
         placedMonsters.push(cell);
-        
         let isDark = Math.random() > 0.5;
         let hpScale = state.stage * 5; let atkScale = state.stage * 2;
         
         state.monsters[`${cell.x},${cell.y}`] = isDark ? 
-             { originX: cell.x, originY: cell.y, type: 'dark', emoji: '🧛', hp: 30+(diff*5)+hpScale, atk: 12+(diff*3)+atkScale, def: diff, name: 'Vampire' } : 
-             { originX: cell.x, originY: cell.y, type: 'beast', emoji: '🐺', hp: 25+(diff*5)+hpScale, atk: 10+(diff*2)+atkScale, def: diff+2, name: 'Werewolf' };
+             { visualX: cell.x, visualY: cell.y, originX: cell.x, originY: cell.y, type: 'dark', emoji: '🧛', hp: 30+(diff*5)+hpScale, atk: 12+(diff*3)+atkScale, def: diff, name: 'Vampire' } : 
+             { visualX: cell.x, visualY: cell.y, originX: cell.x, originY: cell.y, type: 'beast', emoji: '🐺', hp: 25+(diff*5)+hpScale, atk: 10+(diff*2)+atkScale, def: diff+2, name: 'Werewolf' };
              
         emptyCells.splice(i, 1);
     }
@@ -105,75 +180,58 @@ function populateEntities(state) {
     for(let i=0; i<utilCount && emptyCells.length > 0; i++) { state.maze[emptyCells.pop().y][emptyCells.pop().x] = Math.random() > 0.5 ? 13 + Math.floor(Math.random() * 3) : 16 + Math.floor(Math.random() * 3); }
 }
 
-// LOGIKA AI MUSUH (Bisa serang di semua diff, tapi hanya lari mengejar di diff > 3)
 function processEnemyAI(playerObj, state) {
-    if (state.hp <= 0) return false;
-    let newMonsters = {}; let playerAttacked = false; let changed = false; 
+    let newMonsters = {}; let playerAttacked = false; 
     let diff = window.GameConfig.diff || 3;
-    
+    let px = Math.round(state.x); let py = Math.round(state.y);
+    let isUntargetable = (state.hp <= 0 || state.isDead || state.isPaused);
+
     for (let key in state.monsters) {
         let m = state.monsters[key];
         let [mx, my] = key.split(',').map(Number);
         
-        let distToPlayer = Math.abs(state.x - mx) + Math.abs(state.y - my);
+        let distToPlayer = Math.abs(px - mx) + Math.abs(py - my);
         let distToOrigin = Math.abs(m.originX - mx) + Math.abs(m.originY - my);
-        
         let aggroRange = 4; let leashRange = 6; 
         
-        // 1. Serang Duluan Jika Sebelahan (Berlaku Semua Kesulitan)
-        if (distToPlayer === 1) {
+        if (!isUntargetable && distToPlayer <= 1) {
             let mAtk = m.atk;
             if(m.type === 'dark' && state.lightBuff === 0) mAtk += 15;
             let dmgToPlayer = Math.max(0, mAtk - state.def);
             
             state.hp -= dmgToPlayer;
+            state.stats.dmgTaken += dmgToPlayer;
+            
+            let atkEmoji = m.type === 'dark' ? '🦇' : '爪'; 
+            addVisualEffect(state, px, py, atkEmoji, 'enemy_attack');
             triggerEffect(playerObj, 'damage');
             
-            playerAttacked = true; changed = true;
+            playerAttacked = true; 
             newMonsters[`${mx},${my}`] = m;
             
-            if (state.hp <= 0) {
-                state.hp = 0; 
-                showPlayerModal(playerObj, "GAME OVER", `Kamu tewas diserang ${m.name}.`);
-                
-                // Cek jika KEDUA pemain tewas
-                let otherHp = playerObj == 1 ? p2State.hp : p1State.hp;
-                if(otherHp <= 0) {
-                    window.isGameActive = false;
-                    setTimeout(() => {
-                        window.CustomDialog.alert("Kedua pemain telah gugur!", "STAGE GAGAL", () => {
-                            document.getElementById('screen-game').classList.add('hidden');
-                            document.getElementById('screen-menu').classList.remove('hidden');
-                        });
-                    }, 1000);
-                }
-            } else {
-                showToast(playerObj, "AWAS!", `Diserang ${m.emoji} -${dmgToPlayer} HP.`);
+            if (checkDeath(playerObj, state, m.name)) continue; 
+            else if (state.hp > 0 && dmgToPlayer > 0 && !state.isPaused) {
+                showToast(playerObj, "AWAS!", `-${dmgToPlayer} HP`);
             }
         }
-        // 2. Kejar Pemain (Hanya Diff > 3)
-        else if (diff > 3 && distToPlayer <= aggroRange && distToOrigin < leashRange) {
-            let dirs = [[0,-1], [0,1], [-1,0], [1,0]];
-            dirs.sort((a, b) => {
-                let dA = Math.abs(state.x - (mx + a[0])) + Math.abs(state.y - (my + a[1]));
-                let dB = Math.abs(state.x - (mx + b[0])) + Math.abs(state.y - (my + b[1]));
+        else if (!isUntargetable && diff > 3 && distToPlayer <= aggroRange && distToOrigin < leashRange) {
+            let dirs = [[0,-1], [0,1], [-1,0], [1,0]].sort((a, b) => {
+                let dA = Math.abs(px - (mx + a[0])) + Math.abs(py - (my + a[1]));
+                let dB = Math.abs(px - (mx + b[0])) + Math.abs(py - (my + b[1]));
                 return dA - dB; 
             });
 
             let moved = false;
             for (let d of dirs) {
                 let nx = mx + d[0]; let ny = my + d[1];
-                if (state.maze[ny][nx] === 0 && !newMonsters[`${nx},${ny}`]) {
-                    state.maze[my][mx] = 0; state.maze[ny][nx] = 4;
-                    newMonsters[`${nx},${ny}`] = m; moved = true; changed = true; break;
+                if (state.maze[ny][nx] !== 1 && state.maze[ny][nx] !== 3 && !newMonsters[`${nx},${ny}`]) {
+                    newMonsters[`${nx},${ny}`] = m; moved = true; break;
                 }
             }
             if (!moved) newMonsters[`${mx},${my}`] = m;
         }
-        // 3. Kembali ke Titik Awal (Hanya Diff > 3)
-        else if (diff > 3 && distToOrigin > 0 && (distToPlayer > aggroRange || distToOrigin >= leashRange)) {
-            let dirs = [[0,-1], [0,1], [-1,0], [1,0]];
-            dirs.sort((a, b) => {
+        else if (!isUntargetable && diff > 3 && distToOrigin > 0 && (distToPlayer > aggroRange || distToOrigin >= leashRange)) {
+            let dirs = [[0,-1], [0,1], [-1,0], [1,0]].sort((a, b) => {
                 let dA = Math.abs(m.originX - (mx + a[0])) + Math.abs(m.originY - (my + a[1]));
                 let dB = Math.abs(m.originX - (mx + b[0])) + Math.abs(m.originY - (my + b[1]));
                 return dA - dB; 
@@ -182,52 +240,97 @@ function processEnemyAI(playerObj, state) {
             let moved = false;
             for (let d of dirs) {
                 let nx = mx + d[0]; let ny = my + d[1];
-                if (state.maze[ny][nx] === 0 && !newMonsters[`${nx},${ny}`]) {
-                    state.maze[my][mx] = 0; state.maze[ny][nx] = 4;
-                    newMonsters[`${nx},${ny}`] = m; moved = true; changed = true; break;
+                if (state.maze[ny][nx] !== 1 && state.maze[ny][nx] !== 3 && !newMonsters[`${nx},${ny}`]) {
+                    newMonsters[`${nx},${ny}`] = m; moved = true; break;
                 }
             }
             if (!moved) newMonsters[`${mx},${my}`] = m;
         }
-        // 4. Diam Saja (Idle/Roaming)
-        else if (diff > 3) {
-            if (Math.random() < 0.3) {
-                let dirs = [[0,-1], [0,1], [-1,0], [1,0]].sort(() => Math.random() - 0.5);
-                let moved = false;
-                for (let d of dirs) {
-                    let nx = mx + d[0]; let ny = my + d[1];
-                    let distToOrig = Math.abs(m.originX - nx) + Math.abs(m.originY - ny);
-                    if (distToOrig <= 2 && state.maze[ny][nx] === 0 && !newMonsters[`${nx},${ny}`]) {
-                        state.maze[my][mx] = 0; state.maze[ny][nx] = 4;
-                        newMonsters[`${nx},${ny}`] = m; moved = true; changed = true; break;
-                    }
+        else if (Math.random() < 0.3) {
+            let dirs = [[0,-1], [0,1], [-1,0], [1,0]].sort(() => Math.random() - 0.5);
+            let moved = false;
+            for (let d of dirs) {
+                let nx = mx + d[0]; let ny = my + d[1];
+                let distToOrig = Math.abs(m.originX - nx) + Math.abs(m.originY - ny);
+                if (distToOrig <= 2 && state.maze[ny][nx] !== 1 && state.maze[ny][nx] !== 3 && !newMonsters[`${nx},${ny}`]) {
+                    newMonsters[`${nx},${ny}`] = m; moved = true; break;
                 }
-                if (!moved) newMonsters[`${mx},${my}`] = m;
-            } else newMonsters[`${mx},${my}`] = m;
+            }
+            if (!moved) newMonsters[`${mx},${my}`] = m;
         } else {
-            // Jika Diff <= 3, monster diam selamanya sampai didekati
             newMonsters[`${mx},${my}`] = m;
         }
     }
     state.monsters = newMonsters;
     if (playerAttacked) updateStatsUI(playerObj);
-    return changed;
+}
+
+function setupJoysticks() {
+    [1, 2].forEach(p => {
+        let pad = document.getElementById(joysticks[p].pad);
+        let knob = document.getElementById(joysticks[p].knob);
+        if (!pad) return;
+
+        pad.addEventListener('pointerdown', (e) => {
+            let state = p == 1 ? window.p1State : window.p2State;
+            if(!window.isGameActive || state.hp <= 0 || state.isDead || state.isPaused) return;
+            joysticks[p].active = true;
+            pad.setPointerCapture(e.pointerId);
+            moveJoy(e);
+        });
+        pad.addEventListener('pointermove', moveJoy);
+        pad.addEventListener('pointerup', stopJoy);
+        pad.addEventListener('pointercancel', stopJoy);
+
+        function moveJoy(e) {
+            if (!joysticks[p].active) return;
+            let rect = pad.getBoundingClientRect();
+            let cx = rect.left + rect.width/2;
+            let cy = rect.top + rect.height/2;
+            let dx = e.clientX - cx; let dy = e.clientY - cy;
+            let dist = Math.sqrt(dx*dx + dy*dy);
+            let maxDist = rect.width/2 - knob.offsetWidth/2;
+
+            if (dist > maxDist) { dx = (dx/dist) * maxDist; dy = (dy/dist) * maxDist; }
+            knob.style.transform = `translate(${dx}px, ${dy}px)`;
+            joysticks[p].dx = dx / maxDist; joysticks[p].dy = dy / maxDist;
+        }
+        function stopJoy(e) {
+            joysticks[p].active = false;
+            joysticks[p].dx = 0; joysticks[p].dy = 0;
+            knob.style.transform = `translate(0px, 0px)`;
+            pad.releasePointerCapture(e.pointerId);
+        }
+    });
 }
 
 function initGame(p1Name, p2Name) {
     let diff = window.GameConfig.diff || 3;
     let size = 11 + ((diff - 1) * 2); 
     
+    document.getElementById('dead-overlay-p1').classList.add('hidden');
+    document.getElementById('dead-overlay-p2').classList.add('hidden');
+    
     const baseState = () => ({ 
-        x: 1, y: 1, hasKey: false, inventory: [], activeBuffs: [], lightBuff: 0, 
-        score: 0, hp: 100, atk: 15, def: 5, stage: 1, size: size 
+        x: 1, y: 1, visualX: 1, visualY: 1, hasKey: false, inventory: [], activeBuffs: [], lightBuff: 0, 
+        score: 0, hp: 100, atk: 15, def: 5, stage: 1, size: size, isPaused: false, isDead: false,
+        effects: [], stats: { kills: 0, dmgDealt: 0, dmgTaken: 0 }
     });
     
-    p1State = { ...baseState(), id: 1, theme: 'ruins', maze: generateMaze(size, size) };
-    p2State = { ...baseState(), id: 2, theme: 'jungle', maze: generateMaze(size, size) };
+    window.p1State = { ...baseState(), id: 1, name: p1Name, theme: 'ruins', maze: generateMaze(size, size) };
+    window.p2State = { ...baseState(), id: 2, name: p2Name, theme: 'jungle', maze: generateMaze(size, size) };
     
-    populateEntities(p1State); populateEntities(p2State);
+    populateEntities(window.p1State); populateEntities(window.p2State);
     updateStatsUI(1); updateStatsUI(2);
+    
+    if (!window.joysticksReady) { setupJoysticks(); window.joysticksReady = true; }
+    if (window.GameConfig.smooth) {
+        document.querySelectorAll('.dpad').forEach(e => e.classList.add('hidden'));
+        document.querySelectorAll('.analog-pad').forEach(e => e.classList.remove('hidden'));
+    } else {
+        document.querySelectorAll('.dpad').forEach(e => e.classList.remove('hidden'));
+        document.querySelectorAll('.analog-pad').forEach(e => e.classList.add('hidden'));
+    }
     
     clearInterval(gameInterval); clearInterval(enemyInterval);
     let timeRemaining = (window.GameConfig.timer || 2) * 60; 
@@ -241,35 +344,84 @@ function initGame(p1Name, p2Name) {
         let s = (timeRemaining % 60).toString().padStart(2, '0');
         timerUI.innerText = `${m}:${s}`;
 
-        if (timeRemaining <= 0) {
-            clearInterval(gameInterval); clearInterval(enemyInterval);
-            window.isGameActive = false;
-            window.CustomDialog.alert(`Waktu Habis!\nP1: ${p1State.score} | P2: ${p2State.score}`, "GAME OVER", () => {
-                document.getElementById('screen-game').classList.add('hidden');
-                document.getElementById('screen-menu').classList.remove('hidden');
-            });
-        }
+        if (timeRemaining <= 0) triggerGameOver();
     }, 1000);
     
-    // Interval AI selalu jalan (agar diff rendah bisa nyerang kalau bersentuhan)
     enemyInterval = setInterval(() => {
         if (!window.isGameActive) return;
-        let redraw1 = processEnemyAI(1, p1State);
-        let redraw2 = processEnemyAI(2, p2State);
-        if (redraw1 || redraw2) requestAnimationFrame(drawGame);
+        processEnemyAI(1, window.p1State);
+        processEnemyAI(2, window.p2State);
     }, 1000); 
+
+    if (!window.isRenderLoopRunning) {
+        window.isRenderLoopRunning = true;
+        function loop() {
+            if (window.isGameActive) {
+                [1, 2].forEach(p => {
+                    let state = p === 1 ? window.p1State : window.p2State;
+                    if (!state) return;
+
+                    for (let i = state.effects.length - 1; i >= 0; i--) {
+                        state.effects[i].life -= 0.05; 
+                        if (state.effects[i].life <= 0) state.effects.splice(i, 1);
+                    }
+
+                    if (state.hp > 0 && !state.isDead) {
+                        if (window.GameConfig.smooth && !state.isPaused) {
+                            let jx = joysticks[p].dx; let jy = joysticks[p].dy;
+                            if (jx !== 0 || jy !== 0) {
+                                let speed = 0.08;
+                                let nextX = state.x + jx * speed; let nextY = state.y + jy * speed;
+
+                                function isWall(cx, cy) {
+                                    let rx = Math.round(cx); let ry = Math.round(cy);
+                                    if(rx < 0 || rx >= state.size || ry < 0 || ry >= state.size) return true;
+                                    return state.maze[ry][rx] === 1;
+                                }
+                                
+                                let r = 0.35; 
+                                let canX = !isWall(nextX-r, state.y-r) && !isWall(nextX+r, state.y-r) && !isWall(nextX-r, state.y+r) && !isWall(nextX+r, state.y+r);
+                                let canY = !isWall(state.x-r, nextY-r) && !isWall(state.x+r, nextY-r) && !isWall(state.x-r, nextY+r) && !isWall(state.x+r, nextY+r);
+                                
+                                if (canX) state.x = nextX;
+                                if (canY) state.y = nextY;
+
+                                let gridX = Math.round(state.x); let gridY = Math.round(state.y);
+                                if (state.maze[gridY] && state.maze[gridY][gridX] === 3) {
+                                    if (state.hasKey) handleStageClear(p, state);
+                                }
+                            }
+                            state.visualX = state.x; state.visualY = state.y;
+                        } else {
+                            state.visualX += (state.x - state.visualX) * 0.25;
+                            state.visualY += (state.y - state.visualY) * 0.25;
+                        }
+                    }
+
+                    for(let key in state.monsters) {
+                        let m = state.monsters[key];
+                        let [tx, ty] = key.split(',').map(Number);
+                        m.visualX += (tx - m.visualX) * 0.08;
+                        m.visualY += (ty - m.visualY) * 0.08;
+                    }
+                });
+                drawGame();
+            }
+            requestAnimationFrame(loop);
+        }
+        loop();
+    }
 
     function resizeCanvas() {
         let canvas1 = document.getElementById('canvas-p1'); let canvas2 = document.getElementById('canvas-p2');
         canvas1.width = canvas1.parentElement.clientWidth || 300; canvas1.height = canvas1.parentElement.clientHeight || 300;
         canvas2.width = canvas2.parentElement.clientWidth || 300; canvas2.height = canvas2.parentElement.clientHeight || 300;
-        drawGame();
     }
     window.addEventListener('resize', resizeCanvas); setTimeout(resizeCanvas, 100); 
 }
 
 function updateStatsUI(playerObj) {
-    let state = playerObj == 1 ? p1State : p2State;
+    let state = playerObj == 1 ? window.p1State : window.p2State;
     document.getElementById(`p${playerObj}-hp`).innerText = state.hp;
     document.getElementById(`p${playerObj}-atk`).innerText = state.atk;
     document.getElementById(`p${playerObj}-def`).innerText = state.def;
@@ -281,6 +433,7 @@ function updateStatsUI(playerObj) {
     
     let invContainer = document.getElementById(`inv-list-p${playerObj}`);
     invContainer.innerHTML = '';
+    
     if (state.inventory.length === 0) {
         invContainer.innerHTML = '<p style="color:#aaa; width:100%; text-align:center;">Tas Kosong</p>';
     } else {
@@ -289,8 +442,17 @@ function updateStatsUI(playerObj) {
             btn.className = 'inv-item-btn action-use-item';
             btn.dataset.player = playerObj;
             btn.dataset.index = index;
-            if(itemId === 'key') btn.innerHTML = `🔑<br><small>Kunci Keluar</small>`;
-            else btn.innerHTML = `${window.ITEM_DB[itemId].emoji}<br><small>${window.ITEM_DB[itemId].name}</small>`;
+            
+            if(itemId === 'key') {
+                btn.innerHTML = `🔑<br><small>Kunci Keluar</small>`;
+            } else {
+                let d = window.ITEM_DB[itemId];
+                btn.innerHTML = `${d.emoji}<br><small>${d.name}</small>`;
+                
+                if (d.type === 'heal' && state.hp <= 20) {
+                    btn.classList.add('highlight-heal');
+                }
+            }
             invContainer.appendChild(btn);
         });
     }
@@ -299,38 +461,43 @@ function updateStatsUI(playerObj) {
 function drawGame() {
     let ctx1 = document.getElementById('canvas-p1').getContext('2d');
     let ctx2 = document.getElementById('canvas-p2').getContext('2d');
-    renderMaze(ctx1, p1State.maze, p1State.size, p1State.size, p1State.theme, p1State);
-    renderMaze(ctx2, p2State.maze, p2State.size, p2State.size, p2State.theme, p2State);
+    renderMaze(ctx1, window.p1State.maze, window.p1State.size, window.p1State.size, window.p1State.theme, window.p1State);
+    renderMaze(ctx2, window.p2State.maze, window.p2State.size, window.p2State.size, window.p2State.theme, window.p2State);
 }
 
 function grabItem(playerObj) {
-    let state = playerObj == 1 ? p1State : p2State;
-    let cell = state.maze[state.y][state.x];
+    let state = playerObj == 1 ? window.p1State : window.p2State;
+    if (state.isPaused || state.isDead) return;
+
+    let gridX = Math.round(state.x); let gridY = Math.round(state.y);
+    let cell = state.maze[gridY][gridX];
     
     let diff = window.GameConfig.diff || 3;
-    // Kapasitas tas menyusut di kesulitan tinggi (Max: 7 di diff 1, Min: 3 di diff 5)
-    let maxInv = Math.max(3, 8 - diff); 
+    let maxInv = 10 - diff; 
+    let currentItemsCount = state.inventory.filter(i => i !== 'key').length;
     
     if (cell === 2 || (cell >= 10 && cell <= 23)) {
-        if(state.inventory.length >= maxInv) { showToast(playerObj, "TAS PENUH", `Maksimal ${maxInv} barang!`); return; }
+        if(cell !== 2 && currentItemsCount >= maxInv) { 
+            showToast(playerObj, "TAS PENUH", `Maks. ${maxInv} barang!`); return; 
+        }
         
         let itemName = "";
         if (cell === 2) { state.inventory.push('key'); state.hasKey = true; itemName = "Kunci Emas 🔑"; }
         else { state.inventory.push(cell); itemName = `${window.ITEM_DB[cell].emoji} ${window.ITEM_DB[cell].name}`; }
         
-        state.maze[state.y][state.x] = 0; state.score += 15;
+        state.maze[gridY][gridX] = 0; state.score += 15;
         triggerEffect(playerObj, 'buff');
         showToast(playerObj, "AMBIL", `${itemName} masuk tas.`);
-        updateStatsUI(playerObj); drawGame();
-    } else showToast(playerObj, "KOSONG", "Tidak ada item di bawahmu.");
+        updateStatsUI(playerObj); 
+    } else showToast(playerObj, "KOSONG", "Tidak ada item.");
 }
 
 function useItem(playerObj, itemIndex) {
-    let state = playerObj == 1 ? p1State : p2State;
+    let state = playerObj == 1 ? window.p1State : window.p2State;
     let itemId = state.inventory[itemIndex];
     if (!itemId) return;
     
-    if (itemId === 'key') { showToast(playerObj, "INFO", "Tabrak pintu otomatis pakai kunci."); return; }
+    if (itemId === 'key') { showToast(playerObj, "INFO", "Tabrak pintu untuk pakai."); return; }
     
     let item = window.ITEM_DB[itemId];
     state.inventory.splice(itemIndex, 1);
@@ -338,10 +505,11 @@ function useItem(playerObj, itemIndex) {
     
     if(item.type === 'heal') {
         state.hp = Math.min(200, state.hp + item.val);
+        if (state.isPaused) state.isPaused = false; 
         triggerEffect(playerObj, 'heal'); 
-        showToast(playerObj, "HEAL", `Gluk! +${item.val} HP.`);
+        showToast(playerObj, "HEAL", `+${item.val} HP.`);
     } else {
-        let buffObj = { id: item.id, emoji: item.emoji };
+        let buffObj = { id: itemId, emoji: item.emoji }; 
         state.activeBuffs.push(buffObj);
         triggerEffect(playerObj, 'buff'); 
         
@@ -361,80 +529,91 @@ function useItem(playerObj, itemIndex) {
             updateStatsUI(playerObj);
         }, item.dur * 1000);
     }
-    updateStatsUI(playerObj); drawGame();
+    updateStatsUI(playerObj); 
 }
 
-// Tombol Serang Manual
 function attackEnemy(playerObj) {
-    let state = playerObj == 1 ? p1State : p2State;
-    if (!window.isGameActive || state.hp <= 0) return;
+    let state = playerObj == 1 ? window.p1State : window.p2State;
+    if (!window.isGameActive || state.hp <= 0 || state.isDead || state.isPaused) return;
 
+    let px = Math.round(state.x); let py = Math.round(state.y);
     let targetKey = null;
+
     for (let key in state.monsters) {
         let [mx, my] = key.split(',').map(Number);
-        let dist = Math.abs(state.x - mx) + Math.abs(state.y - my);
-        // Serang monster yang ada persis di sebelah
-        if (dist === 1) { targetKey = key; break; }
+        let dist = Math.abs(px - mx) + Math.abs(py - my);
+        if (dist <= 1) { targetKey = key; break; }
     }
 
     if (targetKey) {
-        triggerEffect(playerObj, 'attack'); 
         let monster = state.monsters[targetKey];
         let pAtk = state.atk;
         if (monster.type === 'dark' && state.lightBuff > 0) pAtk += 20;
 
         let dmgToMonster = Math.max(1, pAtk - monster.def);
         monster.hp -= dmgToMonster;
+        state.stats.dmgDealt += dmgToMonster;
+
+        let weaponEmoji = '💥'; 
+        let atkBuffs = state.activeBuffs.filter(b => window.ITEM_DB[b.id] && window.ITEM_DB[b.id].type === 'atk');
+        if (atkBuffs.length > 0) weaponEmoji = atkBuffs[atkBuffs.length - 1].emoji;
+
+        triggerEffect(playerObj, 'attack'); 
+        let [mx, my] = targetKey.split(',').map(Number);
+        addVisualEffect(state, mx, my, weaponEmoji, 'player_attack');
 
         if (monster.hp <= 0) {
-            let [mx, my] = targetKey.split(',').map(Number);
-            state.maze[my][mx] = 0;
             delete state.monsters[targetKey];
             state.score += 150;
+            state.stats.kills += 1;
             showToast(playerObj, "MENANG!", `${monster.emoji} hancur!`);
         } else {
-            showToast(playerObj, "SERANG!", `Kena! -${dmgToMonster} HP.`);
-            // Serangan balik otomatis diurus oleh Interval prosesEnemyAI
+            showToast(playerObj, "SERANG!", `Kena! -${dmgToMonster}`);
         }
-        updateStatsUI(playerObj); drawGame();
+        updateStatsUI(playerObj); 
     } else {
         showToast(playerObj, "KOSONG", "Tidak ada musuh di dekatmu!");
     }
 }
 
 function movePlayer(playerObj, dir) {
-    let state = playerObj == 1 ? p1State : p2State;
-    if (state.hp <= 0 || !window.isGameActive) return; 
-    let nextX = state.x; let nextY = state.y;
+    let state = playerObj == 1 ? window.p1State : window.p2State;
+    if (state.hp <= 0 || state.isDead || !window.isGameActive || state.isPaused || window.GameConfig.smooth) return; 
+    
+    let nextX = Math.round(state.x); let nextY = Math.round(state.y);
     
     if (dir === 'up') nextY--; else if (dir === 'down') nextY++;
     else if (dir === 'left') nextX--; else if (dir === 'right') nextX++;
     
     if (nextX >= 0 && nextX < state.size && nextY >= 0 && nextY < state.size) {
         let targetCell = state.maze[nextY][nextX];
-        if (targetCell !== 1) { 
-            if (targetCell === 4) {
-                // Menabrak monster juga berarti memicu serangan
-                attackEnemy(playerObj); 
-            } else if (targetCell === 3) {
-                if (state.hasKey) {
-                    showToast(playerObj, "STAGE CLEAR!", `Mantap! Naik level.`);
-                    state.score += 300; state.stage += 1; state.size += 2; 
-                    state.maze = generateMaze(state.size, state.size);
-                    state.x = 1; state.y = 1;
-                    
-                    let keyIdx = state.inventory.indexOf('key');
-                    if (keyIdx > -1) state.inventory.splice(keyIdx, 1);
-                    state.hasKey = false;
-                    
-                    populateEntities(state);
-                } else showToast(playerObj, "TERKUNCI", "Butuh kunci emas 🔑.");
+        let hasMonster = state.monsters[`${nextX},${nextY}`] !== undefined;
+        
+        if (hasMonster) {
+            attackEnemy(playerObj); 
+        } else if (targetCell !== 1) { 
+            if (targetCell === 3) {
+                if (state.hasKey) handleStageClear(playerObj, state);
+                else showToast(playerObj, "TERKUNCI", "Butuh kunci 🔑.");
             } else {
                 state.x = nextX; state.y = nextY;
             }
         }
     }
-    updateStatsUI(playerObj); requestAnimationFrame(drawGame);
+    updateStatsUI(playerObj); 
+}
+
+let moveTimeouts = { 1: null, 2: null };
+let moveIntervals = { 1: null, 2: null };
+
+function startMoving(player, dir) {
+    movePlayer(player, dir);
+    moveTimeouts[player] = setTimeout(() => {
+        moveIntervals[player] = setInterval(() => { movePlayer(player, dir); }, 150);
+    }, 300);
+}
+function stopMoving(player) {
+    clearTimeout(moveTimeouts[player]); clearInterval(moveIntervals[player]);
 }
 
 document.addEventListener('pointerdown', (e) => {
@@ -448,8 +627,19 @@ document.addEventListener('pointerdown', (e) => {
     else if (btn.classList.contains('action-attack')) attackEnemy(player);
     else if (btn.classList.contains('action-inv')) document.getElementById(`inv-p${player}`).classList.toggle('hidden');
     else if (btn.classList.contains('action-use-item')) useItem(player, btn.dataset.index);
-    else {
+    else if (btn.classList.contains('dpad-btn')) {
         const dir = btn.dataset.dir;
-        if (player && dir) movePlayer(player, dir);
+        if (player && dir) startMoving(player, dir);
     }
 });
+
+document.addEventListener('pointerup', (e) => {
+    let btn = e.target.closest('.dpad-btn');
+    if (btn) stopMoving(btn.dataset.player);
+    else { stopMoving(1); stopMoving(2); }
+});
+document.addEventListener('pointerleave', (e) => {
+    let btn = e.target.closest('.dpad-btn');
+    if (btn) stopMoving(btn.dataset.player);
+});
+document.addEventListener('pointercancel', () => { stopMoving(1); stopMoving(2); });
