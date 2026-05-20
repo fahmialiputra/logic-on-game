@@ -29,9 +29,10 @@ function processContinuousEnemyAI(playerObj, state, dt, isWallFunc) {
         let distFromOrigin = Math.hypot(m.x - m.originX, m.y - m.originY);
         if (m.atkCooldown > 0) m.atkCooldown -= dt;
 
-        let speed = (m.type === 'boss' ? 1.4 : (m.type === 'dark' ? 2.5 : 1.8)) * dt;
-        let aggroRange = diff > 3 ? 4.5 : 1.5; 
-        let r = 0.35; 
+        let dbE = window.ENEMY_DB[m.type] || window.ENEMY_DB['beast'];
+        let speed = dbE.speed * dt;
+        let aggroRange = diff > 3 ? 4.5 : 1.5;
+        let r = 0.35;
 
         // BOSS HEAL
         if (m.type === 'boss' && m.hp < m.maxHp * 0.7 && m.healUses < 3) {
@@ -86,7 +87,8 @@ function processContinuousEnemyAI(playerObj, state, dt, isWallFunc) {
                 state.hp -= dmgToPlayer;
                 state.stats.dmgTaken += baseDmg;
                 
-                addVisualEffect(state, px, py, m.type === 'dark' ? '🦇' : '爪', 'enemy_attack');
+                let atkEff = dbE ? dbE.atkEffect : '💥';
+                addVisualEffect(state, px, py, atkEff, 'enemy_attack');
                 if (baseDmg > 0) triggerEffect(playerObj, 'damage');
                 
                 updateStatsUI(playerObj);

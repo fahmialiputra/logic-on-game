@@ -32,9 +32,11 @@ window.ITEM_DB = {
 };
 
 window.ENEMY_DB = {
-    'dark': { emoji: '🦇', name: 'Vampire', baseHp: 25, baseAtk: 10, baseDef: 0, diffHpBonus: 5, diffAtkBonus: 3, diffDefBonus: 1 },
-    'beast': { emoji: '🐺', name: 'Werewolf', baseHp: 20, baseAtk: 8, baseDef: 1, diffHpBonus: 5, diffAtkBonus: 2, diffDefBonus: 1 },
-    'boss': { emoji: '👹', name: 'Demon Lord', baseHp: 100, baseAtk: 25, baseDef: 0, diffHpBonus: 30, diffAtkBonus: 8, diffDefBonus: 3 }
+    'dark': { emoji: '🦇', name: 'Vampire', baseHp: 25, baseAtk: 10, baseDef: 0, diffHpBonus: 5, diffAtkBonus: 3, diffDefBonus: 1, speed: 2.5, atkEffect: '🦇' },
+    'beast': { emoji: '🐺', name: 'Werewolf', baseHp: 20, baseAtk: 8, baseDef: 1, diffHpBonus: 5, diffAtkBonus: 2, diffDefBonus: 1, speed: 1.8, atkEffect: '爪' },
+    'slime': { emoji: '🦠', name: 'Slime', baseHp: 15, baseAtk: 5, baseDef: 3, diffHpBonus: 4, diffAtkBonus: 2, diffDefBonus: 1, speed: 1.2, atkEffect: '💦' },
+    'skeleton': { emoji: '💀', name: 'Tengkorak', baseHp: 22, baseAtk: 12, baseDef: 1, diffHpBonus: 4, diffAtkBonus: 4, diffDefBonus: 2, speed: 1.6, atkEffect: '🦴' },
+    'boss': { emoji: '👹', name: 'Demon Lord', baseHp: 100, baseAtk: 25, baseDef: 0, diffHpBonus: 30, diffAtkBonus: 8, diffDefBonus: 3, speed: 1.4, atkEffect: '🔥' }
 };
 
 window.PLAYER_BASE_STATE = {
