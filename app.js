@@ -1,6 +1,51 @@
-// app.js - Navigasi, Konfigurasi UI, dan Sistem Anti-Gestur
+window.GameAssets = {
+  images: {},
+  placeholders: {
+    player1: 'assets/img/p1.png',
+    player2: 'assets/img/p2.png',
+    dead: 'assets/img/dead.png',
+    enemy_dark: 'assets/img/vampire.png',
+    enemy_beast: 'assets/img/werewolf.png',
+    enemy_boss: 'assets/img/boss.png',
+    door_closed: 'assets/img/door_closed.png',
+    door_open: 'assets/img/door_open.png',
+    key: 'assets/img/key.png',
+    // Placeholder untuk ID item di ITEM_DB
+    item_10: 'assets/img/item10.png',
+    item_11: 'assets/img/item11.png',
+    item_19: 'assets/img/item19.png'
+  },
+  loadedCount: 0,
+  totalCount: 0,
+  init: function(onComplete) {
+    this.totalCount = Object.keys(this.placeholders).length;
+    if (this.totalCount === 0) return onComplete();
+    
+    for (let key in this.placeholders) {
+      let img = new Image();
+      img.src = this.placeholders[key];
+      img.onload = () => {
+        this.images[key] = img;
+        this.checkComplete(onComplete);
+      };
+      img.onerror = () => {
+        // Jika gagal muat, abaikan (otomatis akan fallback menggunakan emoji di mazeEngine)
+        this.checkComplete(onComplete);
+      };
+    }
+  },
+  checkComplete: function(onComplete) {
+    this.loadedCount++;
+    let pct = Math.floor((this.loadedCount / this.totalCount) * 100);
+    let textEl = document.getElementById('loading-text');
+    if (textEl) textEl.innerText = `${pct}%`;
+    if (this.loadedCount >= this.totalCount) {
+      setTimeout(onComplete, 300); // Selesai
+    }
+  }
+};
 
-window.GameConfig = { timer: 2, diff: 3, smooth: false };
+window.GameConfig = { timer: 2, diff: 3, smooth: false, enemyHpView: 'angka', mode: 'time-trial', maxStage: 5, players: 2 };
 
 window.CustomDialog = {
   show: function(title, message, buttons) {
@@ -35,14 +80,13 @@ window.CustomDialog = {
   }
 };
 
-// -- FUNGSI LEADERBOARD --
 function loadLeaderboard() {
   let lbData = JSON.parse(localStorage.getItem('logicGameLB') || '[]');
   let ul = document.getElementById('leaderboard-list');
   ul.innerHTML = '';
   
   if (lbData.length === 0) {
-    ul.innerHTML = '<li style="text-align:center; color:#aaa; font-size:0.7rem; padding:10px;">Belum ada data bertarung.</li>';
+    ul.innerHTML = '<li style="text-align:center; color:#aaa; font-size:0.7rem; padding:10px;">Belum ada data.</li>';
     return;
   }
   
@@ -55,7 +99,11 @@ function loadLeaderboard() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  // PENCEGAH GESTUR SISTEM OPERASI (Swipe to back, Pull to refresh, Double tap zoom)
+      // Memuat aset terlebih dahulu sebelum masuk ke menu
+      window.GameAssets.init(() => {
+        document.getElementById('screen-loading').classList.add('hidden');
+        document.getElementById('screen-title').classList.remove('hidden');
+      });
   document.addEventListener('contextmenu', event => event.preventDefault());
   document.addEventListener('gesturestart', event => event.preventDefault());
   
@@ -67,9 +115,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }, false);
   
   document.addEventListener('touchmove', function(e) {
-    // Izinkan scroll khusus pada overlay tas, leaderboard, dll.
     if (e.target.closest('.inv-overlay') || e.target.closest('.accordion-body') ||
-      e.target.closest('.modal-content') || e.target.closest('#leaderboard-panel')) {
+      e.target.closest('.modal-content') || e.target.closest('#leaderboard-panel') ||
+      e.target.closest('.mode-options')) {
       return;
     }
     e.preventDefault();
@@ -78,6 +126,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const screens = {
     title: document.getElementById('screen-title'),
     menu: document.getElementById('screen-menu'),
+    modeSelect: document.getElementById('screen-mode-select'),
     review: document.getElementById('screen-review'),
     gameSetup: document.getElementById('screen-game-setup'),
     game: document.getElementById('screen-game'),
@@ -91,7 +140,27 @@ document.addEventListener('DOMContentLoaded', () => {
   
   screens.title.addEventListener('pointerdown', () => switchScreen('menu'));
   document.getElementById('btn-review').addEventListener('pointerdown', () => switchScreen('review'));
-  document.getElementById('btn-configure').addEventListener('pointerdown', () => switchScreen('gameSetup'));
+  
+  // Perubahan Routing Alur Mulai
+  document.getElementById('btn-play').addEventListener('pointerdown', () => switchScreen('modeSelect'));
+  
+  document.getElementById('btn-next-setup').addEventListener('pointerdown', () => {
+    // Ambil Konfigurasi Mode
+    const selMode = document.querySelector('input[name="game-mode"]:checked');
+    window.GameConfig.mode = selMode ? selMode.value : 'time-trial';
+    
+    const selPlayers = document.querySelector('input[name="player-count"]:checked');
+    window.GameConfig.players = selPlayers ? parseInt(selPlayers.value) : 2;
+    
+    // Atur UI Input Nama
+    if (window.GameConfig.players === 1) {
+      document.getElementById('p2-input-group').classList.add('hidden');
+    } else {
+      document.getElementById('p2-input-group').classList.remove('hidden');
+    }
+    
+    switchScreen('gameSetup');
+  });
   
   document.getElementById('btn-leaderboard').addEventListener('pointerdown', () => {
     const panel = document.getElementById('leaderboard-panel');
@@ -112,11 +181,12 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('leaderboard-panel').classList.add('hidden');
   });
   
-  document.querySelectorAll('.btn-back').forEach(btn => {
+  document.querySelectorAll('.btn-back, .btn-back-slim').forEach(btn => {
     btn.addEventListener('pointerdown', (e) => {
       if (e.target.closest('#screen-game')) {
         window.CustomDialog.confirm("Keluar dari game? Progress tidak akan disimpan.", "KELUAR?", () => {
           if (window.gameInterval) clearInterval(window.gameInterval);
+          if (window.enemyInterval) clearInterval(window.enemyInterval);
           window.isGameActive = false;
           switchScreen('menu');
         });
@@ -130,6 +200,10 @@ document.addEventListener('DOMContentLoaded', () => {
   
   document.getElementById('setting-timer').addEventListener('input', (e) => {
     document.getElementById('timer-val').innerText = e.target.value;
+  });
+  
+  document.getElementById('setting-stage').addEventListener('input', (e) => {
+    document.getElementById('stage-val').innerText = e.target.value;
   });
   
   const stars = document.querySelectorAll('.star-rating .star');
@@ -147,8 +221,13 @@ document.addEventListener('DOMContentLoaded', () => {
   
   document.getElementById('btn-save-setting').addEventListener('pointerdown', () => {
     window.GameConfig.timer = parseInt(document.getElementById('setting-timer').value);
+    window.GameConfig.maxStage = parseInt(document.getElementById('setting-stage').value);
     window.GameConfig.diff = parseInt(document.getElementById('setting-diff').value);
     window.GameConfig.smooth = document.getElementById('setting-smooth').checked;
+    
+    const selectedRadio = document.querySelector('input[name="enemy-hp-view"]:checked');
+    window.GameConfig.enemyHpView = selectedRadio ? selectedRadio.value : 'angka';
+    
     modalSetting.classList.add('hidden');
     window.CustomDialog.alert("Konfigurasi berhasil diterapkan!", "BERHASIL");
   });

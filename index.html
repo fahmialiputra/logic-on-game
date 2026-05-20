@@ -9,8 +9,15 @@
 </head>
 <body>
     <button id="btn-fullscreen" class="btn-global">🔲</button>
+
+    <div id="screen-loading" class="screen active" style="z-index: 9999; background: #000;">
+        <div class="title-container">
+            <h2 class="neon-blue">MEMUAT ASET...</h2>
+            <p id="loading-text" class="blink-text neon-yellow" style="margin-top: 20px;">0%</p>
+        </div>
+    </div>
     
-    <div id="screen-title" class="screen active">
+    <div id="screen-title" class="screen hidden">
         <div class="title-container">
             <h1 class="game-title neon-blue">LOGIC ON GAME</h1>
             <p class="blink-text neon-yellow">Tap to Start</p>
@@ -18,11 +25,10 @@
     </div>
     
     <div id="screen-menu" class="screen hidden">
-        <button id="btn-setting" class="btn-global" style="right: 60px;">⚙️</button>
         <h2 class="neon-blue" style="margin-bottom: 30px;">MAIN MENU</h2>
         
         <div class="menu-container">
-            <button id="btn-configure" class="btn-menu arcade-btn">🎮 Mulai Game</button>
+            <button id="btn-play" class="btn-menu arcade-btn">🎮 Mulai Game</button>
             <button id="btn-review" class="btn-menu arcade-btn" style="background: #8e44ad;">📚 Review Materi</button>
             <button id="btn-leaderboard" class="btn-menu arcade-btn btn-small" style="background: #e67e22;">🏆 Leaderboard</button>
         </div>
@@ -32,40 +38,98 @@
             <ul id="leaderboard-list" class="lb-list"></ul>
         </div>
     </div>
-    
-    <div id="modal-setting" class="modal hidden">
-        <div class="modal-content glass-panel glow-blue">
-            <h3 style="color: #3498db; margin-bottom: 20px;">⚙️ SETTINGS</h3>
+
+    <div id="screen-mode-select" class="screen hidden">
+        <button class="btn-back">⬅ Kembali</button>
+        <button id="btn-setting" class="btn-global">⚙️</button>
+        
+        <div class="glass-panel" style="width: 90%; max-width: 500px; text-align:center;">
+            <h2 class="neon-blue" style="margin-bottom: 20px;">PILIH MODE</h2>
             
-            <div class="setting-group">
-                <label>⏱️ Timer: <span id="timer-val" style="color:#f1c40f;">2</span> Menit</label>
-                <input type="range" id="setting-timer" class="custom-range" min="1" max="5" value="2">
-            </div>
-            
-            <div class="setting-group">
-                <label>🔥 Difficulty:</label>
-                <div id="star-rating" class="star-rating">
-                    <span data-val="1" class="star active">★</span>
-                    <span data-val="2" class="star active">★</span>
-                    <span data-val="3" class="star active">★</span>
-                    <span data-val="4" class="star">★</span>
-                    <span data-val="5" class="star">★</span>
-                </div>
-                <input type="hidden" id="setting-diff" value="3">
-            </div>
-            
-            <div class="setting-group" style="display:flex; align-items:center; justify-content:space-between;">
-                <label style="cursor:pointer; display:flex; align-items:center; gap:10px;">
-                    <input type="checkbox" id="setting-smooth" style="width:20px; height:20px; accent-color:#3498db;">
-                    Mode Analog (Smooth)
+            <div class="mode-options">
+                <label class="mode-card">
+                    <input type="radio" name="game-mode" value="time-trial" checked>
+                    <div class="mode-content">
+                        <h4>⏳ Time Trial</h4>
+                        <p>Kumpulkan skor tertinggi sebelum waktu habis!</p>
+                    </div>
+                </label>
+                <label class="mode-card">
+                    <input type="radio" name="game-mode" value="speedrun">
+                    <div class="mode-content">
+                        <h4>🚀 Speedrun</h4>
+                        <p>Selesaikan sejumlah stage secepat mungkin!</p>
+                    </div>
+                </label>
+                <label class="mode-card">
+                    <input type="radio" name="game-mode" value="endless">
+                    <div class="mode-content">
+                        <h4>♾️ Endless</h4>
+                        <p>Bertahan hidup dan capai stage sejauh mungkin!</p>
+                    </div>
                 </label>
             </div>
             
-            <div style="display:flex; gap:10px; margin-top:25px;">
-                <button id="btn-save-setting" class="btn-menu arcade-btn" style="flex:1; background:#27ae60;">SIMPAN</button>
-                <button id="btn-close-setting" class="btn-menu arcade-btn" style="flex:1; background:#555;">TUTUP</button>
+            <h3 style="color:#f1c40f; margin-bottom:10px; margin-top:20px; font-size: 0.8rem;">JUMLAH PEMAIN</h3>
+            <div class="radio-pills" style="margin-bottom:25px;">
+                <label><input type="radio" name="player-count" value="1"><span>1 Pemain (Solo)</span></label>
+                <label><input type="radio" name="player-count" value="2" checked><span>2 Pemain (Versus)</span></label>
             </div>
-            <button id="btn-reset-game" class="btn-danger" style="width:100%; margin-top:15px;">Hapus Data Leaderboard</button>
+            
+            <button id="btn-next-setup" class="btn-menu arcade-btn" style="width:100%;">LANJUT ➡️</button>
+        </div>
+    </div>
+    
+    <div id="modal-setting" class="modal hidden">
+        <div class="modal-content glass-panel glow-blue" style="width: 90%; max-width: 450px;">
+            <h3 class="neon-blue" style="text-align: center; border-bottom: 2px dashed #444; padding-bottom: 15px; margin-bottom: 20px;">⚙️ SETTINGS</h3>
+            
+            <div class="setting-grid">
+                <div class="setting-group">
+                    <label>⏱️ Timer (Time Trial): <span id="timer-val" style="color:#f1c40f;">2</span> Min</label>
+                    <input type="range" id="setting-timer" class="custom-range" min="1" max="5" value="2">
+                </div>
+
+                <div class="setting-group">
+                    <label>🚀 Stage (Speedrun): <span id="stage-val" style="color:#f1c40f;">5</span> Stages</label>
+                    <input type="range" id="setting-stage" class="custom-range" min="3" max="30" value="5">
+                </div>
+                
+                <div class="setting-group">
+                    <label>🔥 Difficulty:</label>
+                    <div id="star-rating" class="star-rating">
+                        <span data-val="1" class="star active">★</span>
+                        <span data-val="2" class="star active">★</span>
+                        <span data-val="3" class="star active">★</span>
+                        <span data-val="4" class="star">★</span>
+                        <span data-val="5" class="star">★</span>
+                    </div>
+                    <input type="hidden" id="setting-diff" value="3">
+                </div>
+
+                <div class="setting-group">
+                    <label style="margin-bottom: 8px; display: block;">👾 Tampilan HP Musuh:</label>
+                    <div class="radio-pills">
+                        <label><input type="radio" name="enemy-hp-view" value="angka" checked><span>Angka</span></label>
+                        <label><input type="radio" name="enemy-hp-view" value="bar"><span>Bar</span></label>
+                        <label><input type="radio" name="enemy-hp-view" value="sembunyi"><span>Sembunyi</span></label>
+                    </div>
+                </div>
+                
+                <div class="setting-group flex-between">
+                    <label>🕹️ Mode Analog (Smooth)</label>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="setting-smooth">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+            
+            <div style="display:flex; gap:10px; margin-top:25px;">
+                <button id="btn-save-setting" class="btn-menu arcade-btn" style="flex:1; background:#27ae60; padding:12px;">SIMPAN</button>
+                <button id="btn-close-setting" class="btn-menu arcade-btn" style="flex:1; background:#555; padding:12px;">TUTUP</button>
+            </div>
+            <button id="btn-reset-game" class="btn-danger arcade-btn" style="width:100%; margin-top:10px;">Hapus Leaderboard</button>
         </div>
     </div>
     
@@ -89,10 +153,10 @@
     </div>
     
     <div id="custom-modal" class="modal hidden" style="z-index: 999;">
-        <div class="modal-content glass-panel glow-red" style="text-align: center;">
+        <div class="modal-content glass-panel glow-red" style="text-align: center; width: 85%; max-width: 400px;">
             <h3 id="custom-modal-title" style="color: #e74c3c; margin-bottom: 15px;">INFO</h3>
             <p id="custom-modal-message" style="margin-bottom: 25px; line-height: 1.6;">Pesan disini</p>
-            <div id="custom-modal-buttons" style="display: flex; gap: 15px; justify-content: center;"></div>
+            <div id="custom-modal-buttons" style="display: flex; gap: 10px; justify-content: center;"></div>
         </div>
     </div>
     
@@ -101,11 +165,11 @@
         <div class="glass-panel" style="width: 80%; max-width: 400px; text-align:center;">
             <h2 class="neon-blue" style="margin-bottom: 20px;">PLAYER SETUP</h2>
             <div style="margin-bottom: 15px; text-align:left;">
-                <label style="color:#3498db; font-size:0.8rem;">Nama Player 1 (Kiri):</label>
+                <label style="color:#3498db; font-size:0.8rem;">Nama Player 1 (P1):</label>
                 <input type="text" id="p1-name" class="custom-input" placeholder="P1..." maxlength="10">
             </div>
-            <div style="margin-bottom: 25px; text-align:left;">
-                <label style="color:#2ecc71; font-size:0.8rem;">Nama Player 2 (Kanan):</label>
+            <div id="p2-input-group" style="margin-bottom: 25px; text-align:left;">
+                <label style="color:#2ecc71; font-size:0.8rem;">Nama Player 2 (P2):</label>
                 <input type="text" id="p2-name" class="custom-input" placeholder="P2..." maxlength="10">
             </div>
             <button id="btn-start-game" class="btn-menu arcade-btn" style="width:100%;">🔥 BERTARUNG!</button>
@@ -117,7 +181,7 @@
         <h2 id="gameover-winner" class="neon-yellow" style="margin-bottom: 30px; font-size: clamp(1rem, 4vw, 2.5rem);">WINNER!</h2>
         
         <div class="gameover-stats-container">
-            <div class="gameover-card glass-panel glow-blue">
+            <div id="go-card-p1" class="gameover-card glass-panel glow-blue">
                 <h3 id="go-p1-name" style="color:#3498db;">PLAYER 1</h3>
                 <p>Skor Akhir: <span id="go-p1-score">0</span></p>
                 <p>Stage Dicapai: <span id="go-p1-stage">1</span></p>
@@ -126,7 +190,7 @@
                 <p>Damage Diterima: <span id="go-p1-dmgTaken" style="color:#e74c3c;">0</span></p>
             </div>
             
-            <div class="gameover-card glass-panel glow-green">
+            <div id="go-card-p2" class="gameover-card glass-panel glow-green">
                 <h3 id="go-p2-name" style="color:#2ecc71;">PLAYER 2</h3>
                 <p>Skor Akhir: <span id="go-p2-score">0</span></p>
                 <p>Stage Dicapai: <span id="go-p2-stage">1</span></p>
@@ -140,11 +204,11 @@
 
     <div id="screen-game" class="screen hidden">
         <div class="game-header">
-            <button class="btn-back" style="top:5px; left:5px; padding:8px;">Keluar</button>
+            <button class="btn-back-slim">Keluar</button>
             <div class="score-timer">
-                <span style="color:#3498db;">P1: <span id="p1-score">0</span></span>
-                <span id="game-timer" style="color:#f1c40f; font-size:1.2rem;">02:00</span>
-                <span style="color:#2ecc71;">P2: <span id="p2-score">0</span></span>
+                <span id="score-p1-wrap" style="color:#3498db;">P1 <span id="header-p1-stage" style="color:#fff; font-size:0.5rem;">[St.1]</span> : <span id="p1-score">0</span></span>
+                <span id="game-timer" style="color:#f1c40f;">00:00</span>
+                <span id="score-p2-wrap" style="color:#2ecc71;">P2 <span id="header-p2-stage" style="color:#fff; font-size:0.5rem;">[St.1]</span> : <span id="p2-score">0</span></span>
             </div>
         </div>
         
@@ -167,6 +231,7 @@
                 </div>
 
                 <div class="canvas-wrapper"><canvas id="canvas-p1"></canvas></div>
+                
                 <div class="controls controls-p1">
                     <div class="move-controls">
                         <div class="dpad" id="dpad-1">
@@ -181,40 +246,46 @@
                     </div>
                     
                     <div class="player-stats compact-stats">
-                        <div class="stats-row">
-                            <span>❤️ <span id="p1-hp">100</span></span>
-                            <span>⚔️ <span id="p1-atk">15</span></span>
-                            <span>🛡️ <span id="p1-def">5</span></span>
+                        <div class="stat-hp-bar">
+                            <div class="hp-fill-base" id="p1-hp-fill-base"></div>
+                            <div class="hp-fill-over" id="p1-hp-fill-over"></div>
+                            <span class="hp-text">❤️ <span id="p1-hp">100</span> | 💠 <span id="p1-shield" style="color:#00ffff;">0</span></span>
                         </div>
-                        <div class="info-row"><span>🏁 Stage: <span id="p1-stage">1</span></span></div>
-                        <div class="info-row"><span>⏱️ Buff: <span id="p1-buffs">-</span></span></div>
-                        <div style="display:flex; gap:5px; margin-top:5px; width:100%;">
-                            <button class="logic-btn action-grab" data-player="1" style="flex:1; background:#2980b9;">AMBIL</button>
-                            <button class="logic-btn action-attack" data-player="1" style="flex:1; background:#c0392b;">⚔️ SERANG</button>
-                            <button class="logic-btn action-inv" data-player="1" style="flex:1; background:#e67e22;">🎒 TAS</button>
+                        <div class="stats-grid">
+                            <div class="stat-box" title="Attack">⚔️ <span id="p1-atk">15</span></div>
+                            <div class="stat-box" title="Defense">🛡️ <span id="p1-def">5</span></div>
+                            <div class="stat-box" title="Stage">🏁 <span id="p1-stage">1</span></div>
                         </div>
+                        <div class="info-row" id="p1-buffs" style="display:flex; align-items:center; gap:2px; height: 26px;">-</div>
+                    </div>
+
+                    <div class="action-pad">
+                        <button class="logic-btn action-attack btn-attack round-btn" data-player="1">⚔️</button>
+                        <button class="logic-btn action-grab btn-grab round-btn" data-player="1">🖐️</button>
+                        <button class="logic-btn action-inv btn-inv round-btn" data-player="1">🎒</button>
                     </div>
                 </div>
             </div>
             
-            <div class="player-screen" id="p2-screen" style="border-left: 4px solid #555;">
+            <div class="player-screen" id="p2-screen">
                 <div id="dead-overlay-p2" class="dead-overlay hidden">
                     <h2>GUGUR</h2>
                     <p>Menunggu Player 1...</p>
                 </div>
-
+                
                 <div id="inv-p2" class="inv-overlay hidden">
-                    <h4 style="color:#2ecc71;">🎒 TAS <span class="p-name-tag p2-tag-name">P2</span></h4>
+                    <h4 style="color:#3498db;">🎒 TAS <span class="p-name-tag p2-tag-name">p2</span></h4>
                     <div id="inv-list-p2" class="inv-grid"></div>
                     <button class="action-inv btn-modal cancel" data-player="2" style="margin-top: 15px;">TUTUP TAS</button>
                 </div>
-
+                
                 <div id="toast-p2" class="toast hidden">
-                    <strong id="toast-p2-title" style="color: #2ecc71;">Info:</strong>
+                    <strong id="toast-p2-title" style="color: #3498db;">Info:</strong>
                     <span id="toast-p2-msg">Pesan</span>
                 </div>
 
                 <div class="canvas-wrapper"><canvas id="canvas-p2"></canvas></div>
+                
                 <div class="controls controls-p2">
                     <div class="move-controls">
                         <div class="dpad" id="dpad-2">
@@ -229,18 +300,23 @@
                     </div>
                     
                     <div class="player-stats compact-stats">
-                        <div class="stats-row">
-                            <span>❤️ <span id="p2-hp">100</span></span>
-                            <span>⚔️ <span id="p2-atk">15</span></span>
-                            <span>🛡️ <span id="p2-def">5</span></span>
+                        <div class="stat-hp-bar">
+                            <div class="hp-fill-base" id="p2-hp-fill-base"></div>
+                            <div class="hp-fill-over" id="p2-hp-fill-over"></div>
+                            <span class="hp-text">❤️ <span id="p2-hp">100</span> | 💠 <span id="p2-shield" style="color:#00ffff;">0</span></span>
                         </div>
-                        <div class="info-row"><span>🏁 Stage: <span id="p2-stage">1</span></span></div>
-                        <div class="info-row"><span>⏱️ Buff: <span id="p2-buffs">-</span></span></div>
-                        <div style="display:flex; gap:5px; margin-top:5px; width:100%;">
-                            <button class="logic-btn action-grab" data-player="2" style="flex:1; background:#2980b9;">AMBIL</button>
-                            <button class="logic-btn action-attack" data-player="2" style="flex:1; background:#c0392b;">⚔️ SERANG</button>
-                            <button class="logic-btn action-inv" data-player="2" style="flex:1; background:#e67e22;">🎒 TAS</button>
+                        <div class="stats-grid">
+                            <div class="stat-box" title="Attack">⚔️ <span id="p2-atk">15</span></div>
+                            <div class="stat-box" title="Defense">🛡️ <span id="p2-def">5</span></div>
+                            <div class="stat-box" title="Stage">🏁 <span id="p2-stage">1</span></div>
                         </div>
+                        <div class="info-row" id="p2-buffs" style="display:flex; align-items:center; gap:2px; height: 26px;">-</div>
+                    </div>
+
+                    <div class="action-pad">
+                        <button class="logic-btn action-attack btn-attack round-btn" data-player="2">⚔️</button>
+                        <button class="logic-btn action-grab btn-grab round-btn" data-player="2">🖐️</button>
+                        <button class="logic-btn action-inv btn-inv round-btn" data-player="2">🎒</button>
                     </div>
                 </div>
             </div>
@@ -250,7 +326,13 @@
     <script src="materials.js"></script>
     <script src="quiz.js"></script>
     <script src="mazeEngine.js"></script>
+    
+    <script src="itemManagement.js"></script>
+    <script src="gameRendering.js"></script>
+    <script src="enemyAI.js"></script>
+    <script src="inputHandling.js"></script>
     <script src="gameLogic.js"></script>
+    
     <script src="app.js"></script>
 </body>
 </html>

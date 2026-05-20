@@ -1,4 +1,4 @@
-// mazeEngine.js - Render Visual Effects & Layering Mulus
+// mazeEngine.js - Generator Map, Fallback Pintu/Kunci, dan Fallback Render Musuh
 
 function generateMaze(width, height) {
     let maze = Array.from({ length: height }, () => Array(width).fill(1));
@@ -32,10 +32,22 @@ function generateMaze(width, height) {
     deadEnds.sort(() => Math.random() - 0.5);
     allPaths.sort(() => Math.random() - 0.5);
     
-    let keyPos = deadEnds.length > 0 ? deadEnds.pop() : allPaths.pop();
+    // FIX BUG: Fallback Kunci & Pintu Keluar
     let exitPos = deadEnds.length > 0 ? deadEnds.pop() : allPaths.pop();
-    maze[keyPos.y][keyPos.x] = 2; // Kunci Emas
-    maze[exitPos.y][exitPos.x] = 3; // Pintu Keluar
+    if (!exitPos) exitPos = {x: width - 2, y: height - 2}; // Fallback jika langka
+    maze[exitPos.y][exitPos.x] = 3; 
+
+    let keyPos; let attempts = 0;
+    do {
+        keyPos = deadEnds.length > 0 ? deadEnds.pop() : allPaths.pop();
+        attempts++;
+    } while (keyPos && keyPos.x === exitPos.x && keyPos.y === exitPos.y && attempts < 100);
+    
+    if (!keyPos || (keyPos.x === exitPos.x && keyPos.y === exitPos.y)) {
+        keyPos = {x: 1, y: 1}; 
+        if (exitPos.x === 1 && exitPos.y === 1) keyPos = {x: 3, y: 1}; 
+    }
+    maze[keyPos.y][keyPos.x] = 2; 
     
     return maze;
 }
@@ -46,111 +58,123 @@ function renderMaze(ctx, maze, width, height, theme, pState) {
     const offsetX = (ctx.canvas.width - (cellSize * width)) / 2;
     const offsetY = (ctx.canvas.height - (cellSize * height)) / 2;
     
-    // 1. Gambar Lantai
     ctx.fillStyle = '#222';
     ctx.fillRect(offsetX, offsetY, width * cellSize, height * cellSize);
 
     let diff = window.GameConfig ? window.GameConfig.diff : 3;
 
-    // 2. Gambar Zona Bahaya (Paling Bawah, Dibuat Sangat Transparan 0.03)
     if (pState && pState.monsters && !pState.isDead) {
         let radius = (diff > 3) ? 4.5 * cellSize : 1.5 * cellSize;
         ctx.fillStyle = 'rgba(231, 76, 60, 0.03)'; 
         
-        for (let key in pState.monsters) {
-            let m = pState.monsters[key];
-            let vx = m.visualX !== undefined ? m.visualX : m.originX;
-            let vy = m.visualY !== undefined ? m.visualY : m.originY;
-            let mCenterX = offsetX + (vx * cellSize) + (cellSize / 2);
-            let mCenterY = offsetY + (vy * cellSize) + (cellSize / 2);
-            
-            ctx.beginPath();
-            ctx.arc(mCenterX, mCenterY, radius, 0, Math.PI * 2); 
-            ctx.fill();
-        }
+        pState.monsters.forEach(m => {
+            let mCenterX = offsetX + (m.visualX * cellSize) + (cellSize / 2);
+            let mCenterY = offsetY + (m.visualY * cellSize) + (cellSize / 2);
+            ctx.beginPath(); ctx.arc(mCenterX, mCenterY, radius, 0, Math.PI * 2); ctx.fill();
+        });
     }
 
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    let assets = window.GameAssets.images;
 
-    // 3. Gambar Tembok & Item
     for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
-            let drawX = offsetX + (x * cellSize); 
-            let drawY = offsetY + (y * cellSize);
-            let centerX = drawX + (cellSize / 2); 
-            let centerY = drawY + (cellSize / 2);
-            
-            if (maze[y][x] === 1) {
+            let drawX = offsetX + (x * cellSize); let drawY = offsetY + (y * cellSize);
+            let centerX = drawX + (cellSize / 2); let centerY = drawY + (cellSize / 2);
+            let cell = maze[y][x];
+
+            if (cell === 1) {
                 ctx.fillStyle = theme === 'jungle' ? '#228B22' : '#5D4037';
                 ctx.fillRect(drawX, drawY, Math.ceil(cellSize), Math.ceil(cellSize));
                 ctx.strokeStyle = 'rgba(0,0,0,0.3)';
                 ctx.strokeRect(drawX, drawY, Math.ceil(cellSize), Math.ceil(cellSize));
-            } else if(maze[y][x] === 3) {
-                ctx.font = `${cellSize * 0.7}px Arial`;
-                ctx.fillText(pState && pState.hasKey ? '🚪' : '🔒', centerX, centerY);
-            } else if(maze[y][x] === 2) {
-                ctx.font = `${cellSize * 0.6}px Arial`; ctx.fillText('🔑', centerX, centerY);
-            } else if(maze[y][x] >= 10 && maze[y][x] <= 23) {
-                if (window.ITEM_DB && window.ITEM_DB[maze[y][x]]) {
+            } else if(cell === 3) {
+                let imgDoor = pState && pState.hasKey ? assets['door_open'] : assets['door_closed'];
+                if(imgDoor) ctx.drawImage(imgDoor, drawX, drawY, cellSize, cellSize);
+                else { ctx.font = `${cellSize * 0.7}px Arial`; ctx.fillText(pState && pState.hasKey ? '🚪' : '🔒', centerX, centerY); }
+            } else if(cell === 2) {
+                if(assets['key']) ctx.drawImage(assets['key'], drawX + cellSize*0.1, drawY + cellSize*0.1, cellSize*0.8, cellSize*0.8);
+                else { ctx.font = `${cellSize * 0.6}px Arial`; ctx.fillText('🔑', centerX, centerY); }
+            } else if(cell >= 10 && cell <= 25) { 
+                let imgItem = assets[`item_${cell}`];
+                if(imgItem) ctx.drawImage(imgItem, drawX + cellSize*0.1, drawY + cellSize*0.1, cellSize*0.8, cellSize*0.8);
+                else if (window.ITEM_DB[cell]) {
                     ctx.font = `${cellSize * 0.6}px Arial`; 
-                    ctx.fillText(window.ITEM_DB[maze[y][x]].emoji, centerX, centerY);
+                    ctx.fillText(window.ITEM_DB[cell].emoji, centerX, centerY);
                 }
             }
         }
     }
 
-    // 4. Gambar Monster
     if (pState && pState.monsters) {
-        for (let key in pState.monsters) {
-            let m = pState.monsters[key];
-            let vx = m.visualX !== undefined ? m.visualX : m.originX;
-            let vy = m.visualY !== undefined ? m.visualY : m.originY;
-            let mCenterX = offsetX + (vx * cellSize) + (cellSize / 2);
-            let mCenterY = offsetY + (vy * cellSize) + (cellSize / 2);
+        pState.monsters.forEach(m => {
+            let mCenterX = offsetX + (m.visualX * cellSize) + (cellSize / 2);
+            let mCenterY = offsetY + (m.visualY * cellSize) + (cellSize / 2);
+            let mImg = assets[`enemy_${m.type}`];
+            let drawSize = (m.type === 'boss') ? cellSize * 1.5 : cellSize * 0.8;
             
-            ctx.font = `${cellSize * 0.7}px Arial`; 
-            ctx.fillText(m.emoji, mCenterX, mCenterY);
-            ctx.font = `bold ${cellSize * 0.25}px Arial`; 
-            ctx.fillStyle = '#ff4d4d';
-            ctx.fillText(`${m.hp}`, mCenterX, mCenterY - (cellSize * 0.35)); 
-        }
+            if(mImg) ctx.drawImage(mImg, mCenterX - drawSize/2, mCenterY - drawSize/2, drawSize, drawSize);
+            else { ctx.font = `${(m.type === 'boss') ? cellSize : cellSize * 0.7}px Arial`; ctx.fillText(m.emoji, mCenterX, mCenterY); }
+            
+            let hpView = window.GameConfig.enemyHpView || 'angka';
+            if (hpView === 'angka') {
+                ctx.font = `bold ${cellSize * 0.25}px Arial`; ctx.fillStyle = '#ff4d4d';
+                ctx.fillText(`${m.hp}`, mCenterX, mCenterY - (cellSize * 0.45)); 
+            } else if (hpView === 'bar') {
+                let barW = cellSize * 0.6; let barH = cellSize * 0.08;
+                let barX = mCenterX - barW / 2; let barY = mCenterY - (cellSize * 0.45);
+                let pct = Math.max(0, Math.min(1, m.hp / (m.maxHp || m.hp)));
+                ctx.fillStyle = '#4a1212'; ctx.fillRect(barX, barY, barW, barH);
+                ctx.fillStyle = pct > 0.35 ? '#2ecc71' : '#e74c3c'; ctx.fillRect(barX, barY, barW * pct, barH);
+                ctx.strokeStyle = '#000'; ctx.lineWidth = 1; ctx.strokeRect(barX, barY, barW, barH);
+            }
+        });
     }
 
-    // 5. Gambar Pemain
     if (pState && pState.visualX !== undefined) {
         let px = offsetX + (pState.visualX * cellSize) + (cellSize / 2);
         let py = offsetY + (pState.visualY * cellSize) + (cellSize / 2);
         
-        ctx.font = `${cellSize * 0.75}px Arial`;
-        if (pState.isDead) {
-            ctx.fillText('🪦', px, py);
-        } else if (pState.hp > 0) {
-            ctx.fillText(pState.id === 1 ? '🧑‍🚀' : '🥷', px, py);
+        if (pState.shield > 0 && !pState.isDead) {
+            ctx.beginPath(); ctx.arc(px, py, cellSize * 0.45, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(0, 255, 255, 0.4)'; ctx.lineWidth = 1.5; ctx.stroke();
+        }
+
+        let pImg = pState.isDead ? assets['dead'] : (pState.id === 1 ? assets['player1'] : assets['player2']);
+        if(pImg) ctx.drawImage(pImg, px - cellSize*0.4, py - cellSize*0.4, cellSize*0.8, cellSize*0.8);
+        else {
+            ctx.font = `${cellSize * 0.75}px Arial`;
+            ctx.fillText(pState.isDead ? '🪦' : (pState.id === 1 ? '🧑‍🚀' : '🥷'), px, py);
         }
     }
 
-    // 6. Gambar Efek Visual Pertarungan
     if (pState && pState.effects) {
         pState.effects.forEach(eff => {
-            ctx.save();
-            ctx.globalAlpha = Math.max(0, eff.life); 
-            
+            ctx.save(); ctx.globalAlpha = Math.max(0, eff.life); 
             let effX = offsetX + (eff.x * cellSize) + (cellSize / 2);
             let effY = offsetY + (eff.y * cellSize) + (cellSize / 2);
             
-            if (eff.type === 'enemy_attack') {
+            if (eff.type === 'shield_trail') {
+                ctx.beginPath(); ctx.arc(effX, effY, cellSize * 0.1 * eff.life, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(0, 255, 255, ${eff.life * 0.8})`;
+                ctx.shadowBlur = 5; ctx.shadowColor = '#00ffff'; ctx.fill();
+            } 
+            else if (eff.type === 'enemy_attack') {
+                ctx.font = `${cellSize * 1.5}px Arial`; ctx.translate(effX, effY); ctx.rotate(0.2); ctx.fillText(eff.emoji, 0, 0);
+            }
+            else if (eff.type === 'player_attack_swing') {
                 ctx.font = `${cellSize * 1.5}px Arial`;
+                
+                // Matematika interpolasi ayunan (Rotasi)
+                let rot = (1 - eff.life) * (Math.PI); // Ayunan Sebesar 180 Derajat seiring waktu habis
+                let angle = Math.atan2(eff.dy || 0, eff.dx || 1); // Sudut target hadap
+                
                 ctx.translate(effX, effY);
-                ctx.rotate(0.2);
+                ctx.rotate(angle - (Math.PI/2) + rot); // Mulai sedikit dari belakang target, lalu mengayun maju
                 ctx.fillText(eff.emoji, 0, 0);
-            } else if (eff.type === 'player_attack') {
-                ctx.font = `${cellSize * 1.2}px Arial`;
-                ctx.translate(effX, effY - ((1 - eff.life) * (cellSize * 0.5))); 
-                ctx.fillText(eff.emoji, 0, 0);
-            } else {
-                ctx.font = `${cellSize * 0.8}px Arial`;
-                ctx.translate(effX, effY - ((1 - eff.life) * (cellSize * 0.8)));
-                ctx.fillText(eff.emoji, 0, 0);
+            }
+            else {
+                ctx.font = `${cellSize * 0.8}px Arial`; ctx.translate(effX, effY - ((1 - eff.life) * (cellSize * 0.8))); ctx.fillText(eff.emoji, 0, 0);
             }
             ctx.restore();
         });
