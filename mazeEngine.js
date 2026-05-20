@@ -1,4 +1,4 @@
-function generateMaze(width, height) {
+function generateMaze(width, height, isBossStage = false) {
     let maze = Array.from({ length: height }, () => Array(width).fill(1));
     function carve(x, y) {
         maze[y][x] = 0;
@@ -13,9 +13,15 @@ function generateMaze(width, height) {
     }
     carve(1, 1);
 
-    let deadEnds = []; 
-    let otherPaths = [];
-    
+    if (isBossStage) {
+        for(let y=2; y<height-2; y++) {
+            for(let x=2; x<width-2; x++) {
+                if(maze[y][x] === 1 && Math.random() < 0.4) maze[y][x] = 0;
+            }
+        }
+    }
+
+    let deadEnds = []; let otherPaths = [];
     for (let y = 1; y < height - 1; y++) {
         for (let x = 1; x < width - 1; x++) {
             if (maze[y][x] === 0 && !(x === 1 && y === 1)) {
@@ -38,9 +44,11 @@ function generateMaze(width, height) {
     if (!exitPos) { exitPos = {x: width - 2, y: height - 2}; maze[exitPos.y][exitPos.x] = 0; }
     maze[exitPos.y][exitPos.x] = 3; 
 
-    let keyPos = deadEnds.length > 0 ? deadEnds.pop() : otherPaths.pop();
-    if (!keyPos) { keyPos = {x: 1, y: 2}; maze[keyPos.y][keyPos.x] = 0; }
-    maze[keyPos.y][keyPos.x] = 2; 
+    if (!isBossStage) {
+        let keyPos = deadEnds.length > 0 ? deadEnds.pop() : otherPaths.pop();
+        if (!keyPos) { keyPos = {x: 1, y: 2}; maze[keyPos.y][keyPos.x] = 0; }
+        maze[keyPos.y][keyPos.x] = 2; 
+    }
     
     return maze;
 }

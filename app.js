@@ -29,7 +29,6 @@ window.GameAssets = {
         this.checkComplete(onComplete);
       };
       img.onerror = () => {
-        // Jika gagal muat, abaikan (otomatis akan fallback menggunakan emoji di mazeEngine)
         this.checkComplete(onComplete);
       };
     }

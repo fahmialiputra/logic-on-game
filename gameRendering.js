@@ -34,40 +34,46 @@ function addVisualEffect(state, x, y, emoji, type = 'normal') {
 function updateStatsUI(playerObj) {
   let state = playerObj == 1 ? window.p1State : window.p2State;
   
+  // PEMBARUAN BOSS HP BAR UI
+  let bossHpWrap = document.getElementById(`boss-hp-wrap-p${playerObj}`);
+  let bossHpFill = document.getElementById(`boss-hp-fill-p${playerObj}`);
+  let bossHpText = document.getElementById(`boss-hp-text-p${playerObj}`);
+  
+  if (bossHpWrap && state.monsters) {
+      let boss = state.monsters.find(m => m.type === 'boss');
+      if (boss) {
+          bossHpWrap.classList.remove('hidden');
+          let pct = Math.max(0, (boss.hp / boss.maxHp) * 100);
+          bossHpFill.style.width = pct + '%';
+          bossHpText.innerText = `${boss.name}: ${Math.round(boss.hp)}/${boss.maxHp}`;
+      } else {
+          bossHpWrap.classList.add('hidden');
+      }
+  }
+  
   let baseFill = document.getElementById(`p${playerObj}-hp-fill-base`);
   let overFill = document.getElementById(`p${playerObj}-hp-fill-over`);
   if (baseFill && overFill) {
-      // Warna Lapis HP 
       let hpColors = [
-          'linear-gradient(90deg, #e74c3c, #c0392b)', // 0-100 (Red)
-          'linear-gradient(90deg, #e67e22, #d35400)', // 101-200 (Orange)
-          'linear-gradient(90deg, #f1c40f, #f39c12)', // 201-300 (Yellow)
-          'linear-gradient(90deg, #2ecc71, #27ae60)', // 301-400 (Green)
-          'linear-gradient(90deg, #3498db, #2980b9)', // 401-500 (Blue)
-          'linear-gradient(90deg, #9b59b6, #8e44ad)', // 501-600 (Purple)
-          'linear-gradient(90deg, #ff9ff3, #feca57)'  // 600+ (Pink/Gold)
+          'linear-gradient(90deg, #e74c3c, #c0392b)', 'linear-gradient(90deg, #e67e22, #d35400)',
+          'linear-gradient(90deg, #f1c40f, #f39c12)', 'linear-gradient(90deg, #2ecc71, #27ae60)',
+          'linear-gradient(90deg, #3498db, #2980b9)', 'linear-gradient(90deg, #9b59b6, #8e44ad)',
+          'linear-gradient(90deg, #ff9ff3, #feca57)'
       ];
-      
       let maxLayer = hpColors.length - 1;
       let currentLayer = Math.max(0, Math.ceil(state.hp / 100) - 1);
       let prevLayer = Math.max(0, currentLayer - 1);
-      
       let fgColor = hpColors[Math.min(currentLayer, maxLayer)];
       let bgColor = currentLayer > 0 ? hpColors[Math.min(prevLayer, maxLayer)] : '#8b0000';
-      
       let pct = state.hp % 100;
-      if (state.hp > 0 && pct === 0) pct = 100; // Layar Penuh pada ujung lapisan
+      if (state.hp > 0 && pct === 0) pct = 100; 
       if (state.hp <= 0) pct = 0;
 
-      baseFill.style.width = '100%';
-      baseFill.style.background = bgColor;
-      
-      overFill.style.width = pct + '%';
-      overFill.style.background = fgColor;
-      overFill.style.opacity = '1';
+      baseFill.style.width = '100%'; baseFill.style.background = bgColor;
+      overFill.style.width = pct + '%'; overFill.style.background = fgColor; overFill.style.opacity = '1';
   }
   
-  document.getElementById(`p${playerObj}-hp`).innerText = state.hp;
+  document.getElementById(`p${playerObj}-hp`).innerText = Math.round(state.hp);
   document.getElementById(`p${playerObj}-shield`).innerText = state.shield;
   document.getElementById(`p${playerObj}-atk`).innerText = state.atk;
   document.getElementById(`p${playerObj}-def`).innerText = state.def;
@@ -79,15 +85,27 @@ function updateStatsUI(playerObj) {
   
   let buffHTML = state.activeBuffs.map((b, i) => {
     let pct = (b.timeLeft / b.maxTime) * 100;
-    return `<div class="buff-indicator" id="buff-p${playerObj}-${b.id}-${i}" style="--pct: ${pct}%" title="${b.name}"><span>${b.emoji}</span></div>`;
+    let emoji = b.emoji || '✨';
+    return `<div class="buff-indicator" id="buff-p${playerObj}-${b.id}-${i}" style="--pct: ${pct}%" title="${b.name}"><span>${emoji}</span></div>`;
   }).join('');
   document.getElementById(`p${playerObj}-buffs`).innerHTML = buffHTML || '-';
   
   let invContainer = document.getElementById(`inv-list-p${playerObj}`);
   invContainer.innerHTML = '';
   
+  let diff = window.GameConfig.diff || 3;
+  let maxInv = (28 - (diff * 4)) + (state.maxInvBonus || 0);
+  let currentItemsCount = state.inventory.filter(i => i !== 'key').length;
+
+  // Update Teks Judul Kapasitas Tas di Elemen Overlay H4
+  let tagElements = document.querySelectorAll(`#inv-p${playerObj} h4`);
+  if (tagElements.length > 0) {
+      let pLabel = playerObj == 1 ? window.p1State.name : window.p2State.name;
+      tagElements[0].innerHTML = `🎒 TAS ${pLabel} (${currentItemsCount}/${maxInv})`;
+  }
+  
   if (state.inventory.length === 0) {
-    invContainer.innerHTML = '<p style="color:#aaa; width:100%; text-align:center;">Tas Kosong</p>';
+    invContainer.innerHTML = '<p style="color:#aaa; width:100%; text-align:center; grid-column: span 4; font-size:0.55rem; padding: 20px 0;">Tas Kosong</p>';
   } else {
     state.inventory.forEach((itemId, index) => {
       let btn = document.createElement('button');
@@ -96,14 +114,11 @@ function updateStatsUI(playerObj) {
       btn.dataset.index = index;
       
       if (itemId === 'key') {
-        btn.innerHTML = `🔑<br><small>Kunci Keluar</small>`;
+        btn.innerHTML = `🔑<br><small>Kunci</small>`;
       } else {
         let d = window.ITEM_DB[itemId];
         btn.innerHTML = `${d.emoji}<br><small>${d.name}</small>`;
-        
-        if (state.isPaused && state.hp === 1 && (d.type === 'heal' || d.type === 'shield')) {
-          btn.classList.add('highlight-heal');
-        }
+        if (state.isPaused && state.hp === 1 && (d.type === 'heal' || d.type === 'shield')) btn.classList.add('highlight-heal');
       }
       invContainer.appendChild(btn);
     });
