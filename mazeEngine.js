@@ -1,5 +1,3 @@
-// mazeEngine.js - Generator Map, Fallback Pintu/Kunci, dan Fallback Render Musuh
-
 function generateMaze(width, height) {
     let maze = Array.from({ length: height }, () => Array(width).fill(1));
     function carve(x, y) {
@@ -15,38 +13,33 @@ function generateMaze(width, height) {
     }
     carve(1, 1);
 
-    let deadEnds = []; let allPaths = [];
+    let deadEnds = []; 
+    let otherPaths = [];
+    
     for (let y = 1; y < height - 1; y++) {
         for (let x = 1; x < width - 1; x++) {
             if (maze[y][x] === 0 && !(x === 1 && y === 1)) {
-                allPaths.push({x, y});
                 let pathNeighbors = 0;
                 if (maze[y-1][x] === 0) pathNeighbors++;
                 if (maze[y+1][x] === 0) pathNeighbors++;
                 if (maze[y][x-1] === 0) pathNeighbors++;
                 if (maze[y][x+1] === 0) pathNeighbors++;
+                
                 if (pathNeighbors === 1) deadEnds.push({x, y});
+                else otherPaths.push({x, y});
             }
         }
     }
-    deadEnds.sort(() => Math.random() - 0.5);
-    allPaths.sort(() => Math.random() - 0.5);
     
-    // FIX BUG: Fallback Kunci & Pintu Keluar
-    let exitPos = deadEnds.length > 0 ? deadEnds.pop() : allPaths.pop();
-    if (!exitPos) exitPos = {x: width - 2, y: height - 2}; // Fallback jika langka
+    deadEnds.sort(() => Math.random() - 0.5);
+    otherPaths.sort(() => Math.random() - 0.5);
+    
+    let exitPos = deadEnds.length > 0 ? deadEnds.pop() : otherPaths.pop();
+    if (!exitPos) { exitPos = {x: width - 2, y: height - 2}; maze[exitPos.y][exitPos.x] = 0; }
     maze[exitPos.y][exitPos.x] = 3; 
 
-    let keyPos; let attempts = 0;
-    do {
-        keyPos = deadEnds.length > 0 ? deadEnds.pop() : allPaths.pop();
-        attempts++;
-    } while (keyPos && keyPos.x === exitPos.x && keyPos.y === exitPos.y && attempts < 100);
-    
-    if (!keyPos || (keyPos.x === exitPos.x && keyPos.y === exitPos.y)) {
-        keyPos = {x: 1, y: 1}; 
-        if (exitPos.x === 1 && exitPos.y === 1) keyPos = {x: 3, y: 1}; 
-    }
+    let keyPos = deadEnds.length > 0 ? deadEnds.pop() : otherPaths.pop();
+    if (!keyPos) { keyPos = {x: 1, y: 2}; maze[keyPos.y][keyPos.x] = 0; }
     maze[keyPos.y][keyPos.x] = 2; 
     
     return maze;

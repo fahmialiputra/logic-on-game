@@ -187,6 +187,8 @@ document.addEventListener('DOMContentLoaded', () => {
         window.CustomDialog.confirm("Keluar dari game? Progress tidak akan disimpan.", "KELUAR?", () => {
           if (window.gameInterval) clearInterval(window.gameInterval);
           if (window.enemyInterval) clearInterval(window.enemyInterval);
+          if (window.deathTimeout) clearTimeout(window.deathTimeout); // <- TAMBAHAN BARU
+          
           window.isGameActive = false;
           switchScreen('menu');
         });

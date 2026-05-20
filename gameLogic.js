@@ -1,7 +1,8 @@
-// gameLogic.js - Inti State, Game Loop, Kematian, dan Serangan Pemain
+// gameLogic.js - Update Reset UI Kematian & Bug Double-Pop Item
 
 window.p1State = {}; window.p2State = {};
 window.gameInterval = null; window.enemyInterval = null;
+window.deathTimeout = null; 
 window.isGameActive = false;
 window.lastFrameTime = 0;
 
@@ -67,11 +68,11 @@ function executeDeath(playerObj, state, killerName) {
     showToast(playerObj, "GUGUR", `Tewas oleh ${killerName}`);
     
     if (window.GameConfig.players === 1) {
-        setTimeout(triggerGameOver, 2000); 
+        window.deathTimeout = setTimeout(triggerGameOver, 2000); 
     } else {
         let otherHp = playerObj == 1 ? window.p2State.hp : window.p1State.hp;
         let otherDead = playerObj == 1 ? window.p2State.isDead : window.p1State.isDead;
-        if(otherHp <= 0 || otherDead) setTimeout(triggerGameOver, 2000); 
+        if(otherHp <= 0 || otherDead) window.deathTimeout = setTimeout(triggerGameOver, 2000); 
     }
 }
 
@@ -90,16 +91,28 @@ function checkDeath(playerObj, state, killerName) {
             return false; 
         }
         
-        if (state.score >= 1000) {
+        let maxResurrect = 3;
+        if (diff > 4) maxResurrect = 1;
+        else if (diff >= 3) maxResurrect = 3;
+        else if (diff === 2) maxResurrect = 5;
+        else maxResurrect = 10;
+        
+        let currentResurrects = state.resurrectCount || 0;
+        
+        if (state.score >= 1000 && currentResurrects < maxResurrect) {
             state.isPromptingResurrect = true;
             state.isPaused = true;
             
+            let cost = Math.floor(state.score * 0.25);
+            let sisa = maxResurrect - currentResurrects;
+            
             window.CustomDialog.confirm(
-                `Kamu tewas! Ingin bangkit kembali dengan buff kebal 10 detik?\n\nBiaya: 25% Skor (Skormu: ${state.score})`, 
+                `Kamu tewas! Bangkit kembali dengan buff kebal 10 detik?\n(Sisa kesempatan: ${sisa}x)\n\nBiaya: 25% Skor (-${cost} pts)`, 
                 "RESURRECTION", 
-                () => { // Confirm
+                () => { // Dikonfirmasi
                     state.isPromptingResurrect = false;
-                    state.score = Math.floor(state.score * 0.75);
+                    state.resurrectCount = currentResurrects + 1;
+                    state.score -= cost;
                     state.hp = 100; state.isPaused = false; state.isDead = false; state.isInvincible = true;
                     
                     let screen = document.getElementById(`p${playerObj}-screen`);
@@ -113,7 +126,7 @@ function checkDeath(playerObj, state, killerName) {
                     
                     updateStatsUI(playerObj);
                 },
-                () => { // Batal
+                () => { // Dibatalkan
                     state.isPromptingResurrect = false;
                     executeDeath(playerObj, state, killerName);
                 }
@@ -133,7 +146,6 @@ function checkLineOfSight(state, x1, y1, x2, y2) {
     for (let i = 1; i <= steps; i++) {
         let cx = x1 + (x2 - x1) * (i / steps);
         let cy = y1 + (y2 - y1) * (i / steps);
-        // FIX BUG: Menggunakan round untuk sinkronisasi posisi musuh (float) ke array maze (int)
         let rx = Math.round(cx); let ry = Math.round(cy);
         if (rx >= 0 && rx < state.width && ry >= 0 && ry < state.height) {
             if (state.maze[ry][rx] === 1) return false; 
@@ -148,9 +160,8 @@ function attackEnemy(playerObj) {
 
     let px = state.x; let py = state.y;
     
-    // FIX BUG: Perbesar Radius Jangkauan agar mencakup diagonal area pada musuh off-grid
     let atkRange = 1.5; 
-    let weaponEmoji = '👊'; 
+    let weaponEmoji = '💥'; 
     let atkBuffs = state.activeBuffs.filter(b => window.ITEM_DB[b.id] && window.ITEM_DB[b.id].type === 'atk');
     
     if (atkBuffs.length > 0) {
@@ -172,7 +183,6 @@ function attackEnemy(playerObj) {
     let targetIdx = -1; let minDist = Infinity;
     state.monsters.forEach((m, idx) => {
         let dist = Math.hypot(px - m.x, py - m.y);
-        // Musuh bisa diserang hanya jika tak terhalang dinding (LOS True) dan masuk Radius
         if (dist <= atkRange && dist < minDist && checkLineOfSight(state, px, py, m.x, m.y)) { 
             targetIdx = idx; minDist = dist; 
         }
@@ -212,7 +222,6 @@ function populateEntities(state) {
     emptyCells.sort(() => Math.random() - 0.5);
     
     let diff = window.GameConfig.diff || 3;
-    // FIX FEATURE: Jika Diff > 3, Boss di Stage 5. Sisanya Boss Stage di Stage 10.
     let bossInterval = diff > 3 ? 5 : 10;
     let isBossStage = state.stage % bossInterval === 0;
 
@@ -255,18 +264,28 @@ function populateEntities(state) {
     let healCount = Math.max(2, 7 - diff) * mapSizeMultiplier; 
     let shieldCount = Math.max(1, 3 - Math.floor(diff / 2)) * mapSizeMultiplier; 
     
+    // PERBAIKAN FATAL BUG DOUBLE-POP: Menggunakan 1 pop per putaran agar aman
     for(let i=0; i<healCount && emptyCells.length > 0; i++) {
         let base = diff >= 4 ? 19 : 20;
         let id = Math.min(23, base + Math.floor(Math.random() * (2 + bd)));
-        state.maze[emptyCells.pop().y][emptyCells.pop().x] = id; 
+        let cell = emptyCells.pop();
+        state.maze[cell.y][cell.x] = id; 
     }
     for(let i=0; i<shieldCount && emptyCells.length > 0; i++) { 
         let id = Math.min(25, 24 + Math.floor(Math.random() * (1 + bd)));
-        state.maze[emptyCells.pop().y][emptyCells.pop().x] = id; 
+        let cell = emptyCells.pop();
+        state.maze[cell.y][cell.x] = id; 
     }
     for(let i=0; i<weaponCount && emptyCells.length > 0; i++) { 
         let id = Math.min(12, 10 + Math.floor(Math.random() * (2 + bd)));
-        state.maze[emptyCells.pop().y][emptyCells.pop().x] = id; 
+        let cell = emptyCells.pop();
+        state.maze[cell.y][cell.x] = id; 
+    }
+    // MENGEMBALIKAN GENERATOR UTILITY (LILIN/OBOR/JUBAH)
+    for(let i=0; i<utilCount && emptyCells.length > 0; i++) { 
+        let id = Math.random() > 0.5 ? 13 + Math.floor(Math.random() * 3) : 16 + Math.floor(Math.random() * 3);
+        let cell = emptyCells.pop();
+        state.maze[cell.y][cell.x] = id; 
     }
 }
 
@@ -319,7 +338,6 @@ function initGame(p1Name, p2Name) {
         if(width % 2 === 0) width++;
     }
 
-    // FIX BUG: Pembersihan Status Sebelumnya Terlalu Detail
     let screen1 = document.getElementById('p1-screen');
     let screen2 = document.getElementById('p2-screen');
     let effectClasses = ['effect-invincible', 'effect-damage', 'effect-heal', 'effect-buff', 'effect-attack'];
@@ -327,7 +345,13 @@ function initGame(p1Name, p2Name) {
     if(screen1) effectClasses.forEach(c => screen1.classList.remove(c));
     if(screen2) effectClasses.forEach(c => screen2.classList.remove(c));
 
-    // Reset Interval Control dari inputHandling.js (jika ada)
+    // FIX BUG: RESET STATUS UI KEMATIAN DAN TAS DARI SESI SEBELUMNYA SECARA TOTAL
+    document.getElementById('dead-overlay-p1').classList.add('hidden');
+    document.getElementById('dead-overlay-p2').classList.add('hidden');
+    document.getElementById('inv-p1').classList.add('hidden');
+    document.getElementById('inv-p2').classList.add('hidden');
+    document.getElementById('screen-gameover').classList.add('hidden');
+
     if (typeof stopMoving === 'function') { stopMoving(1); stopMoving(2); }
     if (window.joysticks) {
         [1, 2].forEach(p => {
@@ -337,6 +361,11 @@ function initGame(p1Name, p2Name) {
         });
     }
 
+    if (window.deathTimeout) {
+        clearTimeout(window.deathTimeout);
+        window.deathTimeout = null;
+    }
+
     const baseState = () => ({ 
         x: 1, y: 1, visualX: 1, visualY: 1, 
         facingX: 1, facingY: 0, 
@@ -344,6 +373,7 @@ function initGame(p1Name, p2Name) {
         score: 0, hp: 100, shield: 0, shieldAngle: 0, 
         atk: 15, def: 5, baseAtk: 15, baseDef: 5,
         stage: 1, width: width, height: height, bossDefeated: 0, maxInvBonus: 0,
+        resurrectCount: 0,
         isPaused: false, isDead: false, isPromptingResurrect: false, isInvincible: false,
         effects: [], stats: { kills: 0, dmgDealt: 0, dmgTaken: 0 }
     });
@@ -398,7 +428,6 @@ function initGame(p1Name, p2Name) {
 
     window.lastFrameTime = performance.now();
 
-    // Sisa loop Game Engine dibiarkan tak ada perubahan
     if (!window.isRenderLoopRunning) {
         window.isRenderLoopRunning = true;
         function loop() {
