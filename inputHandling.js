@@ -92,8 +92,9 @@ function stopMoving(player) {
 }
 
 document.addEventListener('pointerdown', (e) => {
-    if (!window.isGameActive) return;
-    let btn = e.target.closest('.dpad-btn, .action-grab, .action-inv, .action-use-item, .action-attack');
+    if (!window.isGameActive || typeof e.target.closest !== 'function') return;
+    
+    let btn = e.target.closest('.dpad-btn, .action-grab, .action-inv, .action-attack');
     if (!btn) return;
     e.preventDefault();
     
@@ -105,7 +106,6 @@ document.addEventListener('pointerdown', (e) => {
         if (state.isPaused && state.hp === 1) showToast(player, "KRITIS!", "Wajib pakai pemulih/pelindung!");
         else document.getElementById(`inv-p${player}`).classList.toggle('hidden');
     }
-    else if (btn.classList.contains('action-use-item')) useItem(player, btn.dataset.index);
     else if (btn.classList.contains('dpad-btn')) {
         const dir = btn.dataset.dir;
         if (player && dir) startMoving(player, dir);
@@ -113,12 +113,16 @@ document.addEventListener('pointerdown', (e) => {
 });
 
 document.addEventListener('pointerup', (e) => {
+    if (typeof e.target.closest !== 'function') { stopMoving(1); stopMoving(2); return; }
+    
     let btn = e.target.closest('.dpad-btn');
     if (btn) stopMoving(btn.dataset.player);
     else { stopMoving(1); stopMoving(2); }
 });
+
 document.addEventListener('pointerleave', (e) => {
+    if (typeof e.target.closest !== 'function') return;
+    
     let btn = e.target.closest('.dpad-btn');
     if (btn) stopMoving(btn.dataset.player);
 });
-document.addEventListener('pointercancel', () => { stopMoving(1); stopMoving(2); });

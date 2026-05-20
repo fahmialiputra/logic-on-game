@@ -1,5 +1,7 @@
+// gameLogic.js - Update Fungsi executeDeath, checkDeath, attackEnemy, populateEntities, & initGame
+
 window.p1State = {}; window.p2State = {};
-window.gameInterval = null; window.enemyInterval = null;
+window.gameInterval = null; 
 window.deathTimeout = null; 
 window.isGameActive = false;
 window.lastFrameTime = 0;
@@ -14,54 +16,85 @@ function saveToLeaderboard(name, score, stage) {
 
 function triggerGameOver() {
     window.isGameActive = false;
-    clearInterval(window.gameInterval); clearInterval(window.enemyInterval);
+    
+    if (window.gameInterval) { clearInterval(window.gameInterval); window.gameInterval = null; }
+    if (window.deathTimeout) { clearTimeout(window.deathTimeout); window.deathTimeout = null; }
     
     let isSingle = window.GameConfig.players === 1;
-    let n1 = window.p1State.name; let s1 = window.p1State.score;
-    let n2 = isSingle ? "" : window.p2State.name; 
-    let s2 = isSingle ? 0 : window.p2State.score;
+    let mode = window.GameConfig.mode;
+    let n1 = window.p1State.name || 'PLAYER 1'; 
+    let s1 = window.p1State.score || 0;
+    let n2 = isSingle ? "" : (window.p2State.name || 'PLAYER 2'); 
+    let s2 = isSingle ? 0 : (window.p2State.score || 0);
     
-    let winnerText = "GAME SELESAI!";
-    if (!isSingle) {
-        winnerText = "DRAW!";
-        if (s1 > s2) winnerText = `${n1} WIN!`;
-        else if (s2 > s1) winnerText = `${n2} WIN!`;
-    }
+    let modeText = "MODE: " + mode.toUpperCase().replace('-', ' ');
+    document.getElementById('gameover-winner').innerHTML = `<span style="font-size:0.65rem; display:block; color:#aaa; margin-bottom:5px;">${modeText}</span>`;
 
-    document.getElementById('gameover-winner').innerText = winnerText;
+    if (isSingle) {
+        if (mode === 'speedrun' && window.p1State.stage >= window.GameConfig.maxStage) {
+            document.getElementById('gameover-winner').innerHTML += `<span class="neon-green">SPEEDRUN COMPLETED!</span>`;
+        } else {
+            document.getElementById('gameover-winner').innerHTML += `<span class="neon-red">GAME OVER</span>`;
+        }
+    } else {
+        if (s1 > s2) {
+            document.getElementById('gameover-winner').innerHTML += `<span class="neon-blue">${n1} WINS!</span>`;
+        } else if (s2 > s1) {
+            document.getElementById('gameover-winner').innerHTML += `<span class="neon-green">${n2} WINS!</span>`;
+        } else {
+            document.getElementById('gameover-winner').innerHTML += `<span class="neon-yellow">DRAW / SERI!</span>`;
+        }
+    }
     
-    // P1 Stats
     document.getElementById('go-p1-name').innerText = n1;
     document.getElementById('go-p1-score').innerText = s1;
     document.getElementById('go-p1-stage').innerText = window.p1State.stage;
-    document.getElementById('go-p1-kills').innerText = window.p1State.stats.kills;
-    document.getElementById('go-p1-dmgDealt').innerText = window.p1State.stats.dmgDealt;
-    document.getElementById('go-p1-dmgTaken').innerText = window.p1State.stats.dmgTaken;
+    document.getElementById('go-p1-kills').innerText = window.p1State.stats ? window.p1State.stats.kills : 0;
+    document.getElementById('go-p1-dmgDealt').innerText = window.p1State.stats ? window.p1State.stats.dmgDealt : 0;
+    document.getElementById('go-p1-dmgTaken').innerText = window.p1State.stats ? window.p1State.stats.dmgTaken : 0;
     saveToLeaderboard(n1, s1, window.p1State.stage);
 
     let goCardP2 = document.getElementById('go-card-p2');
     if (!isSingle) {
-        goCardP2.classList.remove('hidden');
+        goCardP2.style.display = 'block';
         document.getElementById('go-p2-name').innerText = n2;
         document.getElementById('go-p2-score').innerText = s2;
         document.getElementById('go-p2-stage').innerText = window.p2State.stage;
-        document.getElementById('go-p2-kills').innerText = window.p2State.stats.kills;
-        document.getElementById('go-p2-dmgDealt').innerText = window.p2State.stats.dmgDealt;
-        document.getElementById('go-p2-dmgTaken').innerText = window.p2State.stats.dmgTaken;
+        document.getElementById('go-p2-kills').innerText = window.p2State.stats ? window.p2State.stats.kills : 0;
+        document.getElementById('go-p2-dmgDealt').innerText = window.p2State.stats ? window.p2State.stats.dmgDealt : 0;
+        document.getElementById('go-p2-dmgTaken').innerText = window.p2State.stats ? window.p2State.stats.dmgTaken : 0;
         saveToLeaderboard(n2, s2, window.p2State.stage);
     } else {
-        goCardP2.classList.add('hidden');
+        goCardP2.style.display = 'none';
     }
 
     document.getElementById('screen-game').classList.add('hidden');
-    document.getElementById('custom-modal').classList.add('hidden'); 
+    document.getElementById('custom-modal').classList.add('hidden');
+    
+    let modalUp1 = document.getElementById('upgrade-overlay-p1');
+    if (modalUp1) modalUp1.classList.add('hidden');
+    let modalUp2 = document.getElementById('upgrade-overlay-p2');
+    if (modalUp2) modalUp2.classList.add('hidden');
+    
     document.getElementById('screen-gameover').classList.remove('hidden');
 }
 
 function executeDeath(playerObj, state, killerName) {
     state.hp = 0; state.isDead = true; state.isPaused = false;
     let overlay = document.getElementById(`dead-overlay-p${playerObj}`);
-    if(overlay) overlay.classList.remove('hidden');
+    
+    if (overlay) {
+        let textElement = overlay.querySelector('p');
+        if (textElement) {
+            if (window.GameConfig.players === 1) {
+                textElement.innerText = "Mengakhiri sesi...";
+            } else {
+                let otherP = playerObj == 1 ? "Player 2" : "Player 1";
+                textElement.innerText = `Menunggu ${otherP}...`;
+            }
+        }
+        overlay.classList.remove('hidden');
+    }
 
     showToast(playerObj, "GUGUR", `Tewas oleh ${killerName}`);
     
@@ -77,7 +110,6 @@ function executeDeath(playerObj, state, killerName) {
 function checkDeath(playerObj, state, killerName) {
     if (state.hp <= 0 && !state.isDead) {
         
-        // Pengecekan Item Auto-Revive (Ankh)
         let ankhIndex = state.inventory.indexOf(39);
         if (ankhIndex > -1) {
             state.inventory.splice(ankhIndex, 1);
@@ -204,7 +236,6 @@ function attackEnemy(playerObj) {
             state.monsters.splice(targetIdx, 1);
             state.score += 150; state.stats.kills += 1;
             
-            // LOGIKA UPGRADE STATUS INSTAN KETIKA BOSS BERHASIL DIALAHKAN
             if (monster.type === 'boss') {
                 let diff = window.GameConfig.diff || 3;
                 state.inventory.push('key'); state.hasKey = true;
@@ -212,21 +243,28 @@ function attackEnemy(playerObj) {
                 state.bossDefeated = (state.bossDefeated || 0) + 1;
                 state.maxInvBonus = (state.maxInvBonus || 0) + 2; 
                 
-                let atkBonus = diff * 5; let defBonus = diff * 2;
-                let maxHpBonus = diff * 50; let maxShieldBonus = diff * 25;
+                // SKALA PENINGKATAN STATUS PEMAIN
+                let hpPct = diff === 5 ? 0.075 : (diff >= 3 ? 0.06 : 0.05);
+                let shieldPct = diff === 5 ? 0.05 : (diff >= 3 ? 0.04 : 0.04);
+                let statPct = diff === 5 ? 0.05 : (diff >= 3 ? 0.04 : 0.03);
+                
+                let maxHpBonus = Math.ceil(state.maxHp * hpPct);
+                let maxShieldBonus = Math.ceil(state.maxShield * shieldPct);
+                let atkBonus = Math.ceil(state.baseAtk * statPct);
+                let defBonus = Math.ceil(state.baseDef * statPct);
                 
                 state.baseAtk += atkBonus; state.baseDef += defBonus;
                 state.atk += atkBonus; state.def += defBonus;
                 
-                // Tambahkan peningkatan kapasitas batas maksimum HP & Shield
                 state.maxHp += maxHpBonus;
                 state.maxShield += maxShieldBonus;
-                state.hp = state.maxHp; // Mengisi penuh darah kembali
+                state.hp = state.maxHp; 
                 
-                // Tampilkan overlay khusus ringkasan peningkatan status
-                let upgradeModal = document.getElementById('modal-upgrade');
-                let upgradeList = document.getElementById('upgrade-list');
-                if (upgradeModal && upgradeList) {
+                // Modal Peningkatan Khusus untuk Pemain Tertentu
+                state.isPaused = true; 
+                let upgradeOverlay = document.getElementById(`upgrade-overlay-p${playerObj}`);
+                let upgradeList = document.getElementById(`upgrade-list-p${playerObj}`);
+                if (upgradeOverlay && upgradeList) {
                     upgradeList.innerHTML = `
                         <p style="color:#3498db; font-weight:bold; margin-bottom:5px;">Pahlawan: ${state.name}</p>
                         <p>❤️ Batas Max HP: <span style="color:#2ecc71;">+${maxHpBonus}</span> (Total: ${state.maxHp})</p>
@@ -235,8 +273,7 @@ function attackEnemy(playerObj) {
                         <p>🛡️ Pertahanan DEF: <span style="color:#2ecc71;">+${defBonus}</span></p>
                         <p>🎒 Kapasitas Tas: <span style="color:#f1c40f;">+2 Slot Baru</span></p>
                     `;
-                    upgradeModal.classList.remove('hidden');
-                    window.isGameActive = false; // Menghentikan game sementara untuk membaca
+                    upgradeOverlay.classList.remove('hidden');
                 }
 
                 if (diff > 4 && Math.random() < 0.5) {
@@ -262,36 +299,67 @@ function populateEntities(state) {
     emptyCells.sort(() => Math.random() - 0.5);
     
     let diff = window.GameConfig.diff || 3;
-    let bossInterval = diff > 3 ? 5 : 10;
+    
+    // SKALA PENINGKATAN STATUS MUSUH TIAP NAIK STAGE
+    let hpMult = diff === 5 ? 1.075 : (diff >= 3 ? 1.06 : 1.05);
+    let statMult = diff === 5 ? 1.05 : (diff >= 3 ? 1.04 : 1.03);
+    
+    let stagePow = Math.max(0, state.stage - 1);
+    let scaleHp = Math.pow(hpMult, stagePow);
+    let scaleStat = Math.pow(statMult, stagePow);
+
+    let bossInterval = diff === 5 ? 5 : (diff >= 3 ? 6 : 7);
     let isBossStage = state.stage % bossInterval === 0;
 
     if (isBossStage) {
         let bossCell = emptyCells.shift();
-        let bossHp = 100 + (state.stage * 15) + (diff * 30);
-        let bossAtk = 25 + (state.stage * 4) + (diff * 8);
+        let db = window.ENEMY_DB['boss'];
+        let bossHp = Math.floor((db.baseHp + (diff * db.diffHpBonus)) * scaleHp);
+        let bossAtk = Math.floor((db.baseAtk + (diff * db.diffAtkBonus)) * scaleStat);
+        let bossDef = Math.floor((db.baseDef + (diff * db.diffDefBonus)) * scaleStat);
+        
         state.monsters.push({ 
              x: bossCell.x, y: bossCell.y, originX: bossCell.x, originY: bossCell.y, 
              visualX: bossCell.x, visualY: bossCell.y, atkCooldown: 0, healUses: 0,
-             type: 'boss', emoji: '👹', hp: bossHp, maxHp: bossHp, atk: bossAtk, def: diff * 3, name: 'Demon Lord' 
+             type: 'boss', emoji: db.emoji, hp: bossHp, maxHp: bossHp, atk: bossAtk, def: bossDef, name: db.name 
         });
     } else {
         let monsterCount = Math.floor(Math.max(state.width, state.height) / 4) + diff; 
+        
+        if (diff >= 3) monsterCount = Math.min(monsterCount, Math.floor(state.width * state.height * 0.05));
         let placedMonsters = [];
 
         for(let i = emptyCells.length - 1; i >= 0 && placedMonsters.length < monsterCount; i--) {
             let cell = emptyCells[i];
+            
+            // Jarak Aman dari pemain (Spawn Awal)
             if (Math.abs(cell.x - 1) + Math.abs(cell.y - 1) < (4 + diff)) continue;
+            
+            let tooClose = placedMonsters.some(m => Math.hypot(m.x - cell.x, m.y - cell.y) < 2.5);
+            if (tooClose) continue;
+
             placedMonsters.push(cell);
             let isDark = Math.random() > 0.5;
-            let hpScale = state.stage * 5; let atkScale = state.stage * 2;
-            let baseHp = isDark ? 30+(diff*5)+hpScale : 25+(diff*5)+hpScale;
-            state.monsters.push(isDark ? 
-                 { x: cell.x, y: cell.y, visualX: cell.x, visualY: cell.y, originX: cell.x, originY: cell.y, atkCooldown: 0, type: 'dark', emoji: '🦇', hp: baseHp, maxHp: baseHp, atk: 12+(diff*3)+atkScale, def: diff, name: 'Vampire' } : 
-                 { x: cell.x, y: cell.y, visualX: cell.x, visualY: cell.y, originX: cell.x, originY: cell.y, atkCooldown: 0, type: 'beast', emoji: '🐺', hp: baseHp, maxHp: baseHp, atk: 10+(diff*2)+atkScale, def: diff+2, name: 'Werewolf' });
+            let typeKey = isDark ? 'dark' : 'beast';
+            let db = window.ENEMY_DB[typeKey];
+            
+            let baseHp = db.baseHp + (diff * db.diffHpBonus);
+            let baseAtk = db.baseAtk + (diff * db.diffAtkBonus);
+            let baseDef = db.baseDef + (diff * db.diffDefBonus);
+            
+            let finalHp = Math.floor(baseHp * scaleHp);
+            let finalAtk = Math.floor(baseAtk * scaleStat);
+            let finalDef = Math.floor(baseDef * scaleStat);
+
+            state.monsters.push({ 
+                 x: cell.x, y: cell.y, visualX: cell.x, visualY: cell.y, originX: cell.x, originY: cell.y, 
+                 atkCooldown: 0, type: typeKey, emoji: db.emoji, hp: finalHp, maxHp: finalHp, atk: finalAtk, def: finalDef, name: db.name 
+            });
             emptyCells.splice(i, 1);
         }
     }
     
+    // PEMBAGIAN ITEM PENCEGAH UNSOLVABLE
     let bd = state.bossDefeated || 0;
     let mapSizeMultiplier = Math.max(1, Math.floor(state.height / 10));
     let weaponCount = Math.max(1, 4 - Math.floor(diff / 2)) * mapSizeMultiplier;
@@ -299,27 +367,39 @@ function populateEntities(state) {
     let healCount = Math.max(2, 7 - diff) * mapSizeMultiplier; 
     let shieldCount = Math.max(1, 3 - Math.floor(diff / 2)) * mapSizeMultiplier; 
     
-    // PEMBAGIAN ITEM TINGKAT TINGGI BILA DIFF > 4
-    for(let i=0; i<healCount && emptyCells.length > 0; i++) {
+    emptyCells.sort((a, b) => Math.hypot(a.x - 1, a.y - 1) - Math.hypot(b.x - 1, b.y - 1));
+
+    function getAccessibleCell() {
+        if (emptyCells.length === 0) return null;
+        let maxIndex = Math.max(1, Math.floor(emptyCells.length * 0.35)); // Mengambil dari area 35% terdekat
+        return emptyCells.splice(Math.floor(Math.random() * maxIndex), 1)[0];
+    }
+    
+    function getRandomCell() {
+        if (emptyCells.length === 0) return null;
+        return emptyCells.splice(Math.floor(Math.random() * emptyCells.length), 1)[0];
+    }
+
+    for(let i=0; i<healCount; i++) {
         let base = diff >= 4 ? 19 : 20;
         let id = Math.min(23, base + Math.floor(Math.random() * (2 + bd)));
-        if (diff > 4 && Math.random() > 0.8) id = 37; // Eliksir Potion
-        if (diff > 4 && Math.random() > 0.8) id = 38; // Regen
-        let cell = emptyCells.pop(); state.maze[cell.y][cell.x] = id; 
+        if (diff > 4 && Math.random() > 0.8) id = 37; 
+        if (diff > 4 && Math.random() > 0.8) id = 38; 
+        let cell = getAccessibleCell(); if (cell) state.maze[cell.y][cell.x] = id; 
     }
-    for(let i=0; i<shieldCount && emptyCells.length > 0; i++) { 
+    for(let i=0; i<shieldCount; i++) { 
         let id = Math.min(25, 24 + Math.floor(Math.random() * (1 + bd)));
-        if (diff > 4 && Math.random() > 0.7) id = 30 + Math.floor(Math.random() * 3); // Epic Def Items
-        let cell = emptyCells.pop(); state.maze[cell.y][cell.x] = id; 
+        if (diff > 4 && Math.random() > 0.7) id = 30 + Math.floor(Math.random() * 3); 
+        let cell = getAccessibleCell(); if (cell) state.maze[cell.y][cell.x] = id; 
     }
-    for(let i=0; i<weaponCount && emptyCells.length > 0; i++) { 
+    for(let i=0; i<weaponCount; i++) { 
         let id = Math.min(12, 10 + Math.floor(Math.random() * (2 + bd)));
-        let cell = emptyCells.pop(); state.maze[cell.y][cell.x] = id; 
+        let cell = getRandomCell(); if (cell) state.maze[cell.y][cell.x] = id; 
     }
-    for(let i=0; i<utilCount && emptyCells.length > 0; i++) { 
+    for(let i=0; i<utilCount; i++) { 
         let id = Math.random() > 0.5 ? 13 + Math.floor(Math.random() * 3) : 16 + Math.floor(Math.random() * 3);
-        if (diff > 4 && Math.random() > 0.6) id = 33 + Math.floor(Math.random() * 4); // Epic Util Items
-        let cell = emptyCells.pop(); state.maze[cell.y][cell.x] = id; 
+        if (diff > 4 && Math.random() > 0.6) id = 33 + Math.floor(Math.random() * 4); 
+        let cell = getRandomCell(); if (cell) state.maze[cell.y][cell.x] = id; 
     }
 }
 
@@ -331,10 +411,9 @@ function handleStageClear(playerObj, state) {
     }
     
     let diff = window.GameConfig.diff || 3;
-    let bossInterval = diff > 3 ? 5 : 10;
+    let bossInterval = diff === 5 ? 5 : (diff >= 3 ? 6 : 7);
     let isBossStage = state.stage % bossInterval === 0;
 
-    // Logika ukuran labirin hanya berubah setelah level Boss selesai dibersihkan
     if (isBossStage) {
         state.height += 2;
         state.width += (window.GameConfig.players === 1 ? 4 : 2); 
@@ -377,6 +456,11 @@ function initGame(p1Name, p2Name) {
     document.getElementById('inv-p1').classList.add('hidden');
     document.getElementById('inv-p2').classList.add('hidden');
     document.getElementById('screen-gameover').classList.add('hidden');
+    
+    let bossHpWrapP1 = document.getElementById('boss-hp-wrap-p1');
+    if(bossHpWrapP1) bossHpWrapP1.classList.add('hidden');
+    let bossHpWrapP2 = document.getElementById('boss-hp-wrap-p2');
+    if(bossHpWrapP2) bossHpWrapP2.classList.add('hidden');
 
     if (typeof stopMoving === 'function') { stopMoving(1); stopMoving(2); }
     if (window.joysticks) {
@@ -389,13 +473,13 @@ function initGame(p1Name, p2Name) {
 
     if (window.deathTimeout) { clearTimeout(window.deathTimeout); window.deathTimeout = null; }
 
-    let bossInterval = diff > 3 ? 5 : 10;
+    let bossInterval = diff === 5 ? 5 : (diff >= 3 ? 6 : 7);
     
     const baseState = () => ({ 
         x: 1, y: 1, visualX: 1, visualY: 1, facingX: 1, facingY: 0, 
         hasKey: false, inventory: [], activeBuffs: [], lightBuff: 0, 
-        score: 0, hp: 100, maxHp: 100, shield: 0, maxShield: 100, shieldAngle: 0, teleportAnchor: null,
-        atk: 15, def: 5, baseAtk: 15, baseDef: 5,
+        score: 0, shieldAngle: 0, teleportAnchor: null,
+        ...window.PLAYER_BASE_STATE,
         stage: 1, width: width, height: height, bossDefeated: 0, maxInvBonus: 0, resurrectCount: 0,
         isPaused: false, isDead: false, isPromptingResurrect: false, isInvincible: false,
         effects: [], stats: { kills: 0, dmgDealt: 0, dmgTaken: 0 }
@@ -451,105 +535,118 @@ function initGame(p1Name, p2Name) {
 
     window.lastFrameTime = performance.now();
 
-    if (!window.isRenderLoopRunning) {
-        window.isRenderLoopRunning = true;
-        function loop() {
-            let now = performance.now();
-            let dt = (now - window.lastFrameTime) / 1000;
-            window.lastFrameTime = now;
-
-            if (window.isGameActive) {
-                [1, 2].forEach(p => {
-                    if (p === 2 && window.GameConfig.players === 1) return;
-                    let state = p === 1 ? window.p1State : window.p2State;
-                    if (!state) return;
-
-                    // EKSEKUSI BUFF REGENERASI
-                    let regenBuff = state.activeBuffs.find(b => b.regenRate);
-                    if (regenBuff && state.hp > 0 && !state.isDead) {
-                        state.hp = Math.min(typeof getMaxHpCap === "function" ? getMaxHpCap() : 500, state.hp + regenBuff.regenRate * dt);
-                    }
-
-                    for(let i = state.activeBuffs.length - 1; i >= 0; i--) {
-                        let b = state.activeBuffs[i];
-                        b.timeLeft -= dt;
-                        if(b.timeLeft <= 0) {
-                            if(b.isInvincibility) {
-                                state.isInvincible = false;
-                                let screen = document.getElementById(`p${p}-screen`);
-                                if(screen) screen.classList.remove('effect-invincible');
-                            } else {
-                                state.atk -= (b.atkBonus || 0);
-                                state.def -= (b.defBonus || 0);
-                                state.lightBuff -= (b.lightBonus || 0);
-                            }
-                            showToast(p, "HABIS", `Efek ${b.name} selesai.`);
-                            state.activeBuffs.splice(i, 1);
-                            updateStatsUI(p); 
-                        } else {
-                            let el = document.getElementById(`buff-p${p}-${b.id}-${i}`);
-                            if(el) { el.style.setProperty('--pct', `${(b.timeLeft / b.maxTime) * 100}%`); }
-                        }
-                    }
-
-                    for (let i = state.effects.length - 1; i >= 0; i--) {
-                        state.effects[i].life -= 0.06; 
-                        if (state.effects[i].life <= 0) state.effects.splice(i, 1);
-                    }
-
-                    function isWall(st, cx, cy) {
-                        let rx = Math.round(cx); let ry = Math.round(cy);
-                        if(rx < 0 || rx >= st.width || ry < 0 || ry >= st.height) return true;
-                        return st.maze[ry][rx] === 1;
-                    }
-
-                    if (state.hp > 0 && !state.isDead) {
-                        if (window.GameConfig.smooth && !state.isPaused && !state.isPromptingResurrect) {
-                            let jx = window.joysticks[p].dx; let jy = window.joysticks[p].dy;
-                            if (jx !== 0 || jy !== 0) {
-                                state.facingX = jx; state.facingY = jy;
-                                
-                                // TERAPKAN BUFF KECEPATAN GERAK
-                                let speedMod = 1.0;
-                                let speedBuff = state.activeBuffs.find(b => b.speedMod);
-                                if (speedBuff) speedMod = speedBuff.speedMod;
-                                
-                                let speed = 0.08 * speedMod;
-                                let nextX = state.x + jx * speed; let nextY = state.y + jy * speed;
-                                
-                                let r = 0.35; 
-                                let canX = !isWall(state, nextX-r, state.y-r) && !isWall(state, nextX+r, state.y-r) && !isWall(state, nextX-r, state.y+r) && !isWall(state, nextX+r, state.y+r);
-                                let canY = !isWall(state, state.x-r, nextY-r) && !isWall(state, state.x+r, nextY-r) && !isWall(state, state.x-r, nextY+r) && !isWall(state, state.x+r, nextY+r);
-                                
-                                if (canX) state.x = nextX;
-                                if (canY) state.y = nextY;
-
-                                let gridX = Math.round(state.x); let gridY = Math.round(state.y);
-                                if (state.maze[gridY] && state.maze[gridY][gridX] === 3) {
-                                    if (state.hasKey) handleStageClear(p, state);
-                                }
-                            }
-                            state.visualX = state.x; state.visualY = state.y;
-                        } else {
-                            state.visualX += (state.x - state.visualX) * 0.25;
-                            state.visualY += (state.y - state.visualY) * 0.25;
-                        }
-                    }
-
-                    processContinuousEnemyAI(p, state, dt, isWall);
-
-                });
-                drawGame();
-            }
-            requestAnimationFrame(loop);
-        }
-        loop();
+    // Hentikan sisa loop render dari sesi sebelumnya (jika ada)
+    if (window.renderFrameId) {
+        cancelAnimationFrame(window.renderFrameId);
     }
+
+    // Deklarasikan fungsi loop menggunakan standar global object
+    window.loop = function() {
+        let now = performance.now();
+        let dt = (now - window.lastFrameTime) / 1000;
+        window.lastFrameTime = now;
+
+        if (window.isGameActive) {
+            [1, 2].forEach(p => {
+                if (p === 2 && window.GameConfig.players === 1) return;
+                let state = p === 1 ? window.p1State : window.p2State;
+                if (!state) return;
+
+                let regenBuff = state.activeBuffs.find(b => b.regenRate);
+                if (regenBuff && state.hp > 0 && !state.isDead) {
+                    state.hp = Math.min(typeof getMaxHpCap === "function" ? getMaxHpCap(state) : 100, state.hp + regenBuff.regenRate * dt);
+                }
+
+                for(let i = state.activeBuffs.length - 1; i >= 0; i--) {
+                    let b = state.activeBuffs[i];
+                    b.timeLeft -= dt;
+                    if(b.timeLeft <= 0) {
+                        if(b.isInvincibility) {
+                            state.isInvincible = false;
+                            let screen = document.getElementById(`p${p}-screen`);
+                            if(screen) screen.classList.remove('effect-invincible');
+                        } else {
+                            state.atk -= (b.atkBonus || 0);
+                            state.def -= (b.defBonus || 0);
+                            state.lightBuff -= (b.lightBonus || 0);
+                        }
+                        showToast(p, "HABIS", `Efek ${b.name} selesai.`);
+                        state.activeBuffs.splice(i, 1);
+                        updateStatsUI(p); 
+                    } else {
+                        let el = document.getElementById(`buff-p${p}-${b.id}-${i}`);
+                        if(el) { el.style.setProperty('--pct', `${(b.timeLeft / b.maxTime) * 100}%`); }
+                    }
+                }
+
+                for (let i = state.effects.length - 1; i >= 0; i--) {
+                    state.effects[i].life -= 0.06; 
+                    if (state.effects[i].life <= 0) state.effects.splice(i, 1);
+                }
+
+                function isWall(st, cx, cy) {
+                    let rx = Math.round(cx); let ry = Math.round(cy);
+                    if(rx < 0 || rx >= st.width || ry < 0 || ry >= st.height) return true;
+                    return st.maze[ry][rx] === 1;
+                }
+
+                if (state.hp > 0 && !state.isDead) {
+                    if (window.GameConfig.smooth && !state.isPaused && !state.isPromptingResurrect) {
+                        let jx = window.joysticks[p].dx; let jy = window.joysticks[p].dy;
+                        if (jx !== 0 || jy !== 0) {
+                            state.facingX = jx; state.facingY = jy;
+                            
+                            let speedMod = 1.0;
+                            let speedBuff = state.activeBuffs.find(b => b.speedMod);
+                            if (speedBuff) speedMod = speedBuff.speedMod;
+                            
+                            let speed = 0.08 * speedMod;
+                            let nextX = state.x + jx * speed; let nextY = state.y + jy * speed;
+                            
+                            let r = 0.35; 
+                            let canX = !isWall(state, nextX-r, state.y-r) && !isWall(state, nextX+r, state.y-r) && !isWall(state, nextX-r, state.y+r) && !isWall(state, nextX+r, state.y+r);
+                            let canY = !isWall(state, state.x-r, nextY-r) && !isWall(state, state.x+r, nextY-r) && !isWall(state, state.x-r, nextY+r) && !isWall(state, state.x+r, nextY+r);
+                            
+                            if (canX) state.x = nextX;
+                            if (canY) state.y = nextY;
+
+                            let gridX = Math.round(state.x); let gridY = Math.round(state.y);
+                            if (state.maze[gridY] && state.maze[gridY][gridX] === 3) {
+                                if (state.hasKey) handleStageClear(p, state);
+                            }
+                        }
+                        state.visualX = state.x; state.visualY = state.y;
+                    } else {
+                        state.visualX += (state.x - state.visualX) * 0.25;
+                        state.visualY += (state.y - state.visualY) * 0.25;
+                    }
+                }
+
+                processContinuousEnemyAI(p, state, dt, isWall);
+
+            });
+            drawGame();
+        }
+        // Daftarkan id frame ke global agar bisa dimatikan di sesi berikutnya
+        window.renderFrameId = requestAnimationFrame(window.loop);
+    };
+    
+    // Mulai loop baru
+    window.renderFrameId = requestAnimationFrame(window.loop);
 
     function resizeCanvas() {
         let canvas1 = document.getElementById('canvas-p1'); let canvas2 = document.getElementById('canvas-p2');
-        canvas1.width = canvas1.parentElement.clientWidth || 300; canvas1.height = canvas1.parentElement.clientHeight || 300;
-        canvas2.width = canvas2.parentElement.clientWidth || 300; canvas2.height = canvas2.parentElement.clientHeight || 300;
+        if(canvas1 && canvas1.parentElement) {
+            canvas1.width = canvas1.parentElement.clientWidth || 300; canvas1.height = canvas1.parentElement.clientHeight || 300;
+        }
+        if(canvas2 && canvas2.parentElement) {
+            canvas2.width = canvas2.parentElement.clientWidth || 300; canvas2.height = canvas2.parentElement.clientHeight || 300;
+        }
     }
-    window.addEventListener('resize', resizeCanvas); setTimeout(resizeCanvas, 100); 
+    
+    if (!window.hasResizeListener) {
+        window.addEventListener('resize', resizeCanvas);
+        window.hasResizeListener = true;
+    }
+    setTimeout(resizeCanvas, 100); 
 }
