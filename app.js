@@ -114,7 +114,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }, false);
   
   document.addEventListener('touchmove', function(e) {
-    if (e.target.closest('.inv-overlay') || e.target.closest('.accordion-body') ||
+    if (e.target.closest('.inv-grid') || e.target.closest('.inv-overlay') || e.target.closest('.accordion-body') ||
       e.target.closest('.modal-content') || e.target.closest('#leaderboard-panel') ||
       e.target.closest('.mode-options')) {
       return;
@@ -248,4 +248,13 @@ document.addEventListener('DOMContentLoaded', () => {
     switchScreen('game');
     if (typeof initGame === 'function') initGame(p1Name, p2Name);
   });
+
+  const modalUpgrade = document.getElementById('modal-upgrade');
+  
+  if(document.getElementById('btn-close-upgrade')) {
+      document.getElementById('btn-close-upgrade').addEventListener('pointerdown', () => {
+          modalUpgrade.classList.add('hidden');
+          window.isGameActive = true; // Melanjutkan pergerakan loop utama game
+      });
+  }
 });

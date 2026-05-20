@@ -1,5 +1,3 @@
-// gameLogic.js - Update Reset UI Kematian & Bug Double-Pop Item
-
 window.p1State = {}; window.p2State = {};
 window.gameInterval = null; window.enemyInterval = null;
 window.deathTimeout = null; 
@@ -173,7 +171,6 @@ function attackEnemy(playerObj) {
         else atkRange = 1.8; 
     }
 
-    // Terapkan Buff Tombak Penembus Area
     let pierceBuff = state.activeBuffs.find(b => b.pierce);
     if (pierceBuff) atkRange += pierceBuff.rangeBonus;
 
@@ -187,13 +184,10 @@ function attackEnemy(playerObj) {
     let targetIdx = -1; let minDist = Infinity;
     state.monsters.forEach((m, idx) => {
         let dist = Math.hypot(px - m.x, py - m.y);
-        
         let hasLOS = checkLineOfSight(state, px, py, m.x, m.y);
-        if (pierceBuff && Math.random() < pierceBuff.pierceChance) hasLOS = true; // Tembus tembok prob 50%
+        if (pierceBuff && Math.random() < pierceBuff.pierceChance) hasLOS = true; 
         
-        if (dist <= atkRange && dist < minDist && hasLOS) { 
-            targetIdx = idx; minDist = dist; 
-        }
+        if (dist <= atkRange && dist < minDist && hasLOS) { targetIdx = idx; minDist = dist; }
     });
 
     if (targetIdx > -1) {
@@ -204,21 +198,49 @@ function attackEnemy(playerObj) {
         let dmgToMonster = Math.max(1, pAtk - monster.def);
         monster.hp -= dmgToMonster;
         state.stats.dmgDealt += dmgToMonster;
-        
         state.effects.push({ x: monster.x, y: monster.y, emoji: '💢', life: 1.0, type: 'normal' });
 
         if (monster.hp <= 0) {
             state.monsters.splice(targetIdx, 1);
-            state.score += 150;
-            state.stats.kills += 1;
+            state.score += 150; state.stats.kills += 1;
             
-            // LAKUKAN DROP KEY & ANKH BILA BOSS MATI
+            // LOGIKA UPGRADE STATUS INSTAN KETIKA BOSS BERHASIL DIALAHKAN
             if (monster.type === 'boss') {
+                let diff = window.GameConfig.diff || 3;
                 state.inventory.push('key'); state.hasKey = true;
-                showToast(playerObj, "MENANG!", `Boss Kunci Terbuka!`);
-                if ((window.GameConfig.diff || 3) > 4 && Math.random() < 0.5) {
-                    state.inventory.push(39); // Drop Ankh Revive
-                    showToast(playerObj, "EPIC LOOT!", `Mendapat Ankh Pembangkit!`);
+                
+                state.bossDefeated = (state.bossDefeated || 0) + 1;
+                state.maxInvBonus = (state.maxInvBonus || 0) + 2; 
+                
+                let atkBonus = diff * 5; let defBonus = diff * 2;
+                let maxHpBonus = diff * 50; let maxShieldBonus = diff * 25;
+                
+                state.baseAtk += atkBonus; state.baseDef += defBonus;
+                state.atk += atkBonus; state.def += defBonus;
+                
+                // Tambahkan peningkatan kapasitas batas maksimum HP & Shield
+                state.maxHp += maxHpBonus;
+                state.maxShield += maxShieldBonus;
+                state.hp = state.maxHp; // Mengisi penuh darah kembali
+                
+                // Tampilkan overlay khusus ringkasan peningkatan status
+                let upgradeModal = document.getElementById('modal-upgrade');
+                let upgradeList = document.getElementById('upgrade-list');
+                if (upgradeModal && upgradeList) {
+                    upgradeList.innerHTML = `
+                        <p style="color:#3498db; font-weight:bold; margin-bottom:5px;">Pahlawan: ${state.name}</p>
+                        <p>❤️ Batas Max HP: <span style="color:#2ecc71;">+${maxHpBonus}</span> (Total: ${state.maxHp})</p>
+                        <p>💠 Batas Max Shield: <span style="color:#2ecc71;">+${maxShieldBonus}</span> (Total: ${state.maxShield})</p>
+                        <p>⚔️ Kekuatan ATK: <span style="color:#2ecc71;">+${atkBonus}</span></p>
+                        <p>🛡️ Pertahanan DEF: <span style="color:#2ecc71;">+${defBonus}</span></p>
+                        <p>🎒 Kapasitas Tas: <span style="color:#f1c40f;">+2 Slot Baru</span></p>
+                    `;
+                    upgradeModal.classList.remove('hidden');
+                    window.isGameActive = false; // Menghentikan game sementara untuk membaca
+                }
+
+                if (diff > 4 && Math.random() < 0.5) {
+                    state.inventory.push(39); showToast(playerObj, "EPIC LOOT!", `Mendapat Ankh Pembangkit!`);
                 }
             } else {
                 showToast(playerObj, "MENANG!", `${monster.emoji} hancur!`);
@@ -312,32 +334,22 @@ function handleStageClear(playerObj, state) {
     let bossInterval = diff > 3 ? 5 : 10;
     let isBossStage = state.stage % bossInterval === 0;
 
-    // EKSPANSI MAP HANYA BILA KALAHKAN BOSS
+    // Logika ukuran labirin hanya berubah setelah level Boss selesai dibersihkan
     if (isBossStage) {
-        state.bossDefeated = (state.bossDefeated || 0) + 1;
-        state.maxInvBonus = (state.maxInvBonus || 0) + 2; 
-        
-        let atkBonus = diff * 5; let defBonus = diff * 2;
-        state.baseAtk += atkBonus; state.baseDef += defBonus;
-        state.atk += atkBonus; state.def += defBonus;
-        state.hp = typeof getMaxHpCap === "function" ? getMaxHpCap() : 500; 
-        
         state.height += 2;
         state.width += (window.GameConfig.players === 1 ? 4 : 2); 
-        
-        showToast(playerObj, "BOSS KALAH!", "Status, Senjata & Tas Meningkat!");
+        showToast(playerObj, "NEXT REALM", "Membuka Labirin yang Lebih Luas!");
     } else {
         showToast(playerObj, "STAGE CLEAR!", `Naik level!`);
     }
 
     state.score += 300; state.stage += 1; 
 
-    // Generate dengan memeriksa apakah level SEKARANG akan menjadi Boss stage
     let nextIsBossStage = state.stage % bossInterval === 0;
     state.maze = generateMaze(state.width, state.height, nextIsBossStage);
     
     state.x = 1; state.y = 1; state.visualX = 1; state.visualY = 1;
-    state.teleportAnchor = null; // Reset Jangkar teleportasi per level
+    state.teleportAnchor = null; 
     
     let keyIdx = state.inventory.indexOf('key');
     if (keyIdx > -1) state.inventory.splice(keyIdx, 1);
@@ -382,7 +394,7 @@ function initGame(p1Name, p2Name) {
     const baseState = () => ({ 
         x: 1, y: 1, visualX: 1, visualY: 1, facingX: 1, facingY: 0, 
         hasKey: false, inventory: [], activeBuffs: [], lightBuff: 0, 
-        score: 0, hp: 100, shield: 0, shieldAngle: 0, teleportAnchor: null,
+        score: 0, hp: 100, maxHp: 100, shield: 0, maxShield: 100, shieldAngle: 0, teleportAnchor: null,
         atk: 15, def: 5, baseAtk: 15, baseDef: 5,
         stage: 1, width: width, height: height, bossDefeated: 0, maxInvBonus: 0, resurrectCount: 0,
         isPaused: false, isDead: false, isPromptingResurrect: false, isInvincible: false,

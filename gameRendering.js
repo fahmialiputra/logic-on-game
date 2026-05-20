@@ -1,6 +1,5 @@
-// gameRendering.js - Pengelolaan Visual, Status Bar UI, dan Partikel
-
-function getMaxHpCap() {
+function getMaxHpCap(state) {
+  if (state && state.maxHp) return state.maxHp;
   let diff = window.GameConfig.diff || 3;
   if (diff > 4) return 200;
   if (diff > 2) return 500;
