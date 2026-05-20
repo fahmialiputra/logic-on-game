@@ -1,22 +1,14 @@
+// app.js - Manajemen UI, Navigasi Layar, dan Asset Game
+
 window.GameAssets = {
   images: {},
   placeholders: {
-    player1: 'assets/img/p1.png',
-    player2: 'assets/img/p2.png',
-    dead: 'assets/img/dead.png',
-    enemy_dark: 'assets/img/vampire.png',
-    enemy_beast: 'assets/img/werewolf.png',
-    enemy_boss: 'assets/img/boss.png',
-    door_closed: 'assets/img/door_closed.png',
-    door_open: 'assets/img/door_open.png',
-    key: 'assets/img/key.png',
-    // Placeholder untuk ID item di ITEM_DB
-    item_10: 'assets/img/item10.png',
-    item_11: 'assets/img/item11.png',
-    item_19: 'assets/img/item19.png'
+    player1: 'assets/img/p1.png', player2: 'assets/img/p2.png', dead: 'assets/img/dead.png',
+    enemy_dark: 'assets/img/vampire.png', enemy_beast: 'assets/img/werewolf.png', enemy_boss: 'assets/img/boss.png',
+    door_closed: 'assets/img/door_closed.png', door_open: 'assets/img/door_open.png', key: 'assets/img/key.png',
+    item_10: 'assets/img/item10.png', item_11: 'assets/img/item11.png', item_19: 'assets/img/item19.png'
   },
-  loadedCount: 0,
-  totalCount: 0,
+  loadedCount: 0, totalCount: 0,
   init: function(onComplete) {
     this.totalCount = Object.keys(this.placeholders).length;
     if (this.totalCount === 0) return onComplete();
@@ -24,13 +16,8 @@ window.GameAssets = {
     for (let key in this.placeholders) {
       let img = new Image();
       img.src = this.placeholders[key];
-      img.onload = () => {
-        this.images[key] = img;
-        this.checkComplete(onComplete);
-      };
-      img.onerror = () => {
-        this.checkComplete(onComplete);
-      };
+      img.onload = () => { this.images[key] = img; this.checkComplete(onComplete); };
+      img.onerror = () => { this.checkComplete(onComplete); };
     }
   },
   checkComplete: function(onComplete) {
@@ -38,9 +25,7 @@ window.GameAssets = {
     let pct = Math.floor((this.loadedCount / this.totalCount) * 100);
     let textEl = document.getElementById('loading-text');
     if (textEl) textEl.innerText = `${pct}%`;
-    if (this.loadedCount >= this.totalCount) {
-      setTimeout(onComplete, 300); // Selesai
-    }
+    if (this.loadedCount >= this.totalCount) setTimeout(onComplete, 300);
   }
 };
 
@@ -98,11 +83,11 @@ function loadLeaderboard() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-      // Memuat aset terlebih dahulu sebelum masuk ke menu
-      window.GameAssets.init(() => {
-        document.getElementById('screen-loading').classList.add('hidden');
-        document.getElementById('screen-title').classList.remove('hidden');
-      });
+  window.GameAssets.init(() => {
+    document.getElementById('screen-loading').classList.add('hidden');
+    document.getElementById('screen-title').classList.remove('hidden');
+  });
+
   document.addEventListener('contextmenu', event => event.preventDefault());
   document.addEventListener('gesturestart', event => event.preventDefault());
   
@@ -114,9 +99,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }, false);
   
   document.addEventListener('touchmove', function(e) {
+    // FIX BUG: Memasukkan .mode-options, .radio-pills, .setting-grid agar input radio dan slider berjalan mulus alami tanpa diganggu sistem pointerdown.
     if (e.target.closest('.inv-grid') || e.target.closest('.inv-overlay') || e.target.closest('.accordion-body') ||
       e.target.closest('.modal-content') || e.target.closest('#leaderboard-panel') ||
-      e.target.closest('.mode-options')) {
+      e.target.closest('.mode-options') || e.target.closest('.radio-pills') || e.target.closest('.setting-grid')) {
       return;
     }
     e.preventDefault();
@@ -139,24 +125,17 @@ document.addEventListener('DOMContentLoaded', () => {
   
   screens.title.addEventListener('pointerdown', () => switchScreen('menu'));
   document.getElementById('btn-review').addEventListener('pointerdown', () => switchScreen('review'));
-  
-  // Perubahan Routing Alur Mulai
   document.getElementById('btn-play').addEventListener('pointerdown', () => switchScreen('modeSelect'));
   
   document.getElementById('btn-next-setup').addEventListener('pointerdown', () => {
-    // Ambil Konfigurasi Mode
     const selMode = document.querySelector('input[name="game-mode"]:checked');
     window.GameConfig.mode = selMode ? selMode.value : 'time-trial';
     
     const selPlayers = document.querySelector('input[name="player-count"]:checked');
     window.GameConfig.players = selPlayers ? parseInt(selPlayers.value) : 2;
     
-    // Atur UI Input Nama
-    if (window.GameConfig.players === 1) {
-      document.getElementById('p2-input-group').classList.add('hidden');
-    } else {
-      document.getElementById('p2-input-group').classList.remove('hidden');
-    }
+    if (window.GameConfig.players === 1) document.getElementById('p2-input-group').classList.add('hidden');
+    else document.getElementById('p2-input-group').classList.remove('hidden');
     
     switchScreen('gameSetup');
   });
@@ -180,21 +159,27 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('leaderboard-panel').classList.add('hidden');
   });
   
+  // FIX BUG OVERLAY KELUAR: Memastikan modal-upgrade yang sempat terbuka tertutup paksa
   document.querySelectorAll('.btn-back, .btn-back-slim').forEach(btn => {
       btn.addEventListener('pointerdown', (e) => {
         if (e.target.closest('#screen-game')) {
           window.CustomDialog.confirm("Keluar dari game? Progress tidak akan disimpan.", "KELUAR?", () => {
             window.isGameActive = false;
-            
             if (window.gameInterval) { clearInterval(window.gameInterval); window.gameInterval = null; }
-            if (window.enemyInterval) { clearInterval(window.enemyInterval); window.enemyInterval = null; }
             if (window.deathTimeout) { clearTimeout(window.deathTimeout); window.deathTimeout = null; }
             
-            // Reset visibilitas komponen UI overlay
             document.getElementById('dead-overlay-p1').classList.add('hidden');
             document.getElementById('dead-overlay-p2').classList.add('hidden');
             document.getElementById('inv-p1').classList.add('hidden');
             document.getElementById('inv-p2').classList.add('hidden');
+            
+            let modalUp1 = document.getElementById('upgrade-overlay-p1');
+            if (modalUp1) modalUp1.classList.add('hidden');
+            let modalUp2 = document.getElementById('upgrade-overlay-p2');
+            if (modalUp2) modalUp2.classList.add('hidden');
+            
+            let modalUpgrade = document.getElementById('modal-upgrade');
+            if (modalUpgrade) modalUpgrade.classList.add('hidden');
             
             switchScreen('menu');
           });
@@ -206,13 +191,8 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-setting').addEventListener('pointerdown', () => modalSetting.classList.remove('hidden'));
   document.getElementById('btn-close-setting').addEventListener('pointerdown', () => modalSetting.classList.add('hidden'));
   
-  document.getElementById('setting-timer').addEventListener('input', (e) => {
-    document.getElementById('timer-val').innerText = e.target.value;
-  });
-  
-  document.getElementById('setting-stage').addEventListener('input', (e) => {
-    document.getElementById('stage-val').innerText = e.target.value;
-  });
+  document.getElementById('setting-timer').addEventListener('input', (e) => { document.getElementById('timer-val').innerText = e.target.value; });
+  document.getElementById('setting-stage').addEventListener('input', (e) => { document.getElementById('stage-val').innerText = e.target.value; });
   
   const stars = document.querySelectorAll('.star-rating .star');
   const diffInput = document.getElementById('setting-diff');
@@ -248,20 +228,24 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-start-game').addEventListener('pointerdown', () => {
     const p1Name = document.getElementById('p1-name').value.trim() || 'PLAYER 1';
     const p2Name = document.getElementById('p2-name').value.trim() || 'PLAYER 2';
+    const p1Tag = document.querySelector('.p1-tag-name');
+    if (p1Tag) p1Tag.innerText = p1Name;
     
-    document.querySelector('.p1-tag-name').innerText = p1Name;
-    document.querySelector('.p2-tag-name').innerText = p2Name;
+    const p2Tag = document.querySelector('.p2-tag-name');
+    if (p2Tag) p2Tag.innerText = p2Name;
     
     switchScreen('game');
     if (typeof initGame === 'function') initGame(p1Name, p2Name);
   });
 
-  const modalUpgrade = document.getElementById('modal-upgrade');
-  
-  if(document.getElementById('btn-close-upgrade')) {
-      document.getElementById('btn-close-upgrade').addEventListener('pointerdown', () => {
-          modalUpgrade.classList.add('hidden');
-          window.isGameActive = true; // Melanjutkan pergerakan loop utama game
-      });
-  }
+  document.querySelectorAll('.btn-close-upgrade').forEach(btn => {
+    btn.addEventListener('pointerdown', (e) => {
+      let p = e.target.dataset.player;
+      let overlay = document.getElementById(`upgrade-overlay-p${p}`);
+      if (overlay) overlay.classList.add('hidden');
+      
+      let state = p == 1 ? window.p1State : window.p2State;
+      if (state) state.isPaused = false;
+    });
+  });
 });

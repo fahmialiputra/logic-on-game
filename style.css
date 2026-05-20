@@ -116,9 +116,62 @@ html, body {
 #quiz-options { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 20px; }
 #quiz-options .btn-menu { font-size: clamp(0.6rem, 1.8vw, 0.8rem); padding: 15px 10px; }
 
-/* IN-GAME LAYOUT */
-.game-header { width: 100%; height: 45px; background: #151520; border-bottom: 3px solid #fff; display: flex; align-items: center; justify-content: center; position: relative; box-shadow: 0 4px 10px rgba(0,0,0,0.5); z-index: 30;}
-.score-timer { display: flex; gap: 30px; color: #f1c40f; align-items: center; font-size: 0.8rem; }
+/* IN-GAME LAYOUT (REDESIGNED HEADER) */
+.game-header { 
+    width: 100%; height: 55px; background: linear-gradient(180deg, #151520, #0a0a0f); 
+    border-bottom: 3px solid #f1c40f; display: flex; 
+    align-items: center; justify-content: center; 
+    position: relative; box-shadow: 0 4px 10px rgba(0,0,0,0.8); z-index: 30;
+}
+.btn-back-slim { 
+    position: absolute; left: 10px; top: 50%; transform: translateY(-50%); 
+    background: #c0392b; border: 2px solid #fff; color: #fff; 
+    padding: 6px 12px; font-size: 0.6rem; cursor: pointer; border-radius: 6px; 
+    z-index: 40; box-shadow: 0 2px 0 #8b0000; transition: 0.1s;
+}
+.btn-back-slim:active { transform: translateY(calc(-50% + 2px)); box-shadow: 0 0 0 transparent; }
+
+.score-timer { 
+    display: flex; width: 100%; max-width: 500px; justify-content: center; 
+    gap: 15px; align-items: center; padding: 0 55px; /* Mencegah tabrakan dengan tombol keluar & fullscreen */
+}
+.player-badge { 
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.2);
+    padding: 4px 10px; border-radius: 8px; min-width: 80px; flex: 1;
+}
+.p1-badge { border-bottom: 3px solid #3498db; }
+.p2-badge { border-bottom: 3px solid #2ecc71; }
+
+.badge-name { font-size: 0.55rem; font-weight: bold; color: #fff; margin-bottom: 3px; display: flex; gap: 5px; align-items: center; }
+.p1-badge .badge-name { color: #3498db; }
+.p2-badge .badge-name { color: #2ecc71; }
+.badge-stage { color: #f1c40f; font-size: 0.5rem; background: rgba(0,0,0,0.5); padding: 2px 4px; border-radius: 4px; }
+.badge-score { font-size: 0.7rem; color: #fff; text-shadow: 1px 1px 2px #000; font-weight: bold; }
+
+.timer-badge {
+    background: rgba(0,0,0,0.6); border: 2px solid #e67e22; 
+    padding: 6px 12px; border-radius: 12px; box-shadow: inset 0 0 8px rgba(230,126,34,0.3);
+}
+#game-timer { color: #f1c40f; font-size: 1rem; font-weight: bold; text-shadow: 0 0 8px #e67e22; }
+
+/* OVERLAY UPGRADE PER PLAYER */
+.upgrade-overlay { 
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+    background: rgba(0,0,0,0.85); z-index: 60; display: flex; 
+    justify-content: center; align-items: center; 
+}
+.upgrade-card { 
+    width: 85%; max-width: 300px; text-align: center; padding: 15px; 
+    border-radius: 12px; 
+}
+.upgrade-list { 
+    text-align: left; font-size: 0.6rem; margin-bottom: 15px; line-height: 1.8; 
+    color:#fff; background: rgba(0,0,0,0.5); padding: 10px; 
+    border-radius: 8px; border: 1px solid #444; 
+}
+.btn-close-upgrade { background: #27ae60; padding: 10px; font-size: 0.7rem; }
+
 .split-screen { display: flex; flex-direction: row; width: 100%; height: calc(100vh - 45px); }
 .player-screen { flex: 1; display: flex; flex-direction: column; position: relative; background-color: #000; overflow: hidden; }
 .canvas-wrapper { flex: 1; position: relative; width: 100%; min-height: 0; }
@@ -142,7 +195,7 @@ canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; backgro
 .hp-fill-base { height: 100%; background: linear-gradient(90deg, #e74c3c, #c0392b); width: 100%; position: absolute; top: 0; left: 0; transition: width 0.3s ease; }
 .hp-fill-over { height: 100%; background: linear-gradient(90deg, #3498db, #9b59b6); width: 0%; position: absolute; top: 0; left: 0; transition: width 0.3s ease; opacity: 0.85; }
 .hp-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 0.55rem; color: white; white-space: nowrap; font-weight: bold; text-shadow: 1px 1px 2px #000; z-index: 2; }
-.stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; }
 .stat-box { background: #111; border: 1px solid #444; border-radius: 4px; padding: 6px 2px; font-size: 0.55rem; text-align: center; color: #ddd; }
 .info-row { background: #111; border-top: 1px dashed #444; border-radius: 4px; padding: 2px; }
 
@@ -163,71 +216,72 @@ canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; backgro
 .analog-knob { width: 40%; height: 40%; background: #3498db; border-radius: 50%; border: 2px solid #fff; position: absolute; pointer-events: none; box-shadow: inset -2px -2px 10px rgba(0,0,0,0.5); }
 
 /* TOMBOL AKSI MENYILANG (X, Y, B) */
-.action-pad { position: relative; width: clamp(90px, 30vw, 130px); aspect-ratio: 1 / 1; flex-shrink: 0; }
+.action-pad { position: relative; width: clamp(100px, 32vw, 150px); aspect-ratio: 1 / 1; flex-shrink: 0; }
 .logic-btn.round-btn {
-    position: absolute; width: 38%; height: 38%; border-radius: 50%;
+    position: absolute; width: 42%; height: 42%; border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
-    font-size: clamp(1rem, 4vw, 1.5rem); border: 2px solid #fff; cursor: pointer; color: white;
+    font-size: clamp(1.2rem, 5vw, 1.8rem); border: 3px solid #fff; cursor: pointer; color: white;
     box-shadow: 0 4px 0 rgba(0,0,0,0.5); padding: 0; transition: transform 0.1s ease;
 }
-.logic-btn.round-btn:active { transform: translateY(4px) scale(0.95); box-shadow: 0 0 0 rgba(0,0,0,0); }
-.btn-attack { bottom: 5%; left: 50%; transform: translateX(-50%); background: #c0392b; z-index: 2; }
-.btn-grab { top: 50%; left: 5%; transform: translateY(-50%); background: #2980b9; }
-.btn-inv { top: 50%; right: 5%; transform: translateY(-50%); background: #e67e22; }
+.logic-btn.round-btn:active { box-shadow: 0 0 0 rgba(0,0,0,0); }
+
+.btn-attack { bottom: 0; left: 50%; transform: translateX(-50%); background: #c0392b; z-index: 2; width: 52%; height: 52%; font-size: clamp(1.5rem, 6vw, 2rem);}
+.btn-grab { top: 5%; left: 0; transform: none; background: #2980b9; z-index: 1; }
+.btn-inv { top: 5%; right: 0; transform: none; background: #e67e22; z-index: 1; }
+
 .btn-attack:active { transform: translateX(-50%) translateY(4px) scale(0.95) !important; }
-.btn-grab:active { transform: translateY(-50%) translateY(4px) scale(0.95) !important; }
-.btn-inv:active { transform: translateY(-50%) translateY(4px) scale(0.95) !important; }
+.btn-grab:active { transform: translateY(4px) scale(0.95) !important; }
+.btn-inv:active { transform: translateY(4px) scale(0.95) !important; }
 
 /* --- REDESIGN ERGONOMIS & RINGKAS ISI TAS --- */
 .inv-overlay { 
     position: absolute; 
-    top: 50%; left: 50%; 
+    top: 45%; left: 50%; /* Dinaikkan sedikit agar kontrol tidak terhalang */
     transform: translate(-50%, -50%); 
-    width: 95%; max-width: 380px; 
-    max-height: 80%; 
-    background: rgba(15, 15, 25, 0.98); 
-    backdrop-filter: blur(8px);
-    border: 3px solid #f1c40f; 
-    z-index: 45; padding: 15px; 
-    border-radius: 12px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.8), inset 0 0 15px rgba(241,196,15,0.2);
+    width: 85%; max-width: 280px; /* Lebih ramping */
+    max-height: 65%; /* Dibatasi agar tidak menutup seluruh layar */
+    background: rgba(15, 15, 25, 0.95); 
+    backdrop-filter: blur(5px);
+    border: 2px solid #f1c40f; 
+    z-index: 45; padding: 10px; 
+    border-radius: 10px;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.8), inset 0 0 10px rgba(241,196,15,0.15);
     display: flex; flex-direction: column; 
 }
 .inv-overlay h4 { 
     color: #f1c40f; text-align: center; 
-    margin-bottom: 12px; font-size: 0.8rem;
-    border-bottom: 2px dashed #444; padding-bottom: 8px; 
+    margin-bottom: 8px; font-size: 0.7rem;
+    border-bottom: 1px dashed #444; padding-bottom: 6px; 
     letter-spacing: 1px;
 }
 
-/* Mengaktifkan Fitur Scroll Penuh Pada List Item */
+/* Grid adaptif agar susunan rapi otomatis */
 .inv-grid { 
     display: grid; 
-    grid-template-columns: repeat(4, 1fr); 
-    gap: 10px; 
-    max-height: 45vh; /* Ruang Maksimal untuk Menahan Layout */
-    overflow-y: auto; /* Memaksa Mode Gulir */
-    padding: 8px; 
-    background: rgba(0, 0, 0, 0.6); 
-    border-radius: 8px;
+    grid-template-columns: repeat(auto-fill, minmax(50px, 1fr)); 
+    gap: 6px; 
+    max-height: 40vh; 
+    overflow-y: auto; 
+    padding: 5px; 
+    background: rgba(0, 0, 0, 0.5); 
+    border-radius: 6px;
     border: 1px solid #333;
-    touch-action: pan-y !important; /* Mengizinkan touch-scroll di mobile */
+    touch-action: pan-y !important; 
     overscroll-behavior: contain;
 }
 
-/* Modifikasi Scrollbar Visual Webkit (Android/Chrome/Safari) */
-.inv-grid::-webkit-scrollbar { width: 8px; }
-.inv-grid::-webkit-scrollbar-track { background: rgba(0,0,0,0.5); border-radius: 8px; }
-.inv-grid::-webkit-scrollbar-thumb { background: #f1c40f; border-radius: 8px; }
+.inv-grid::-webkit-scrollbar { width: 6px; }
+.inv-grid::-webkit-scrollbar-track { background: rgba(0,0,0,0.4); border-radius: 6px; }
+.inv-grid::-webkit-scrollbar-thumb { background: #f1c40f; border-radius: 6px; }
 
 .inv-item-btn { 
     background: #222; 
-    border: 2px solid #555; 
-    font-size: 1.5rem; 
+    border: 1px solid #555; 
+    font-size: 1.2rem; /* Ukuran emoji dibuat lebih proporsional */
     aspect-ratio: 1 / 1; 
     padding: 4px; 
     cursor: pointer; 
-    border-radius: 8px; 
+    border-radius: 6px; 
     display: flex; 
     flex-direction: column;
     align-items: center; 
@@ -236,17 +290,21 @@ canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; backgro
     color: white;
     position: relative;
 }
+
+/* Pemotongan teks yang konsisten */
 .inv-item-btn small { 
-    display: block; 
-    font-size: 0.45rem; 
+    display: -webkit-box;
+    -webkit-line-clamp: 2; /* Teks maksimal 2 baris sebelum terpotong titik-titik */
+    -webkit-box-orient: vertical;
+    font-size: 0.4rem; 
+    line-height: 1.2;
     color: #bbb; 
-    margin-top: 5px; 
-    white-space: nowrap;
+    margin-top: 3px; 
     overflow: hidden;
     text-overflow: ellipsis; 
     width: 100%;
     text-align: center;
-    padding: 0 2px;
+    white-space: normal;
 }
 .inv-item-btn:active { 
     transform: scale(0.92); 
@@ -294,7 +352,7 @@ canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; backgro
     .player-screen { border-left: none; border-top: 4px solid #fff; }
     .controls { padding: 6px 2%; gap: 4px; justify-content: space-evenly; }
     .move-controls { width: clamp(75px, 25vw, 110px); }
-    .action-pad { width: clamp(75px, 25vw, 110px); }
+    .action-pad { width: clamp(95px, 28vw, 120px); }
     .compact-stats { width: 45%; max-width: 160px; padding: 4px; }
     .gameover-stats-container { flex-direction: column; gap: 15px; }
     #quiz-options { grid-template-columns: 1fr; }

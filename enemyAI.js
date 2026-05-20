@@ -1,9 +1,10 @@
+// enemyAI.js - Advanced AI with Critical Error Fallbacks
+
 function processContinuousEnemyAI(playerObj, state, dt, isWallFunc) {
     let px = state.x; let py = state.y;
     let isUntargetable = (state.hp <= 0 || state.isDead || state.isPaused || state.isPromptingResurrect);
     let diff = window.GameConfig.diff || 3;
 
-    // Cari koordinat pintu gembok/keluar (cell === 3)
     let exitX = -1, exitY = -1;
     for (let y = 0; y < state.height; y++) {
         for (let x = 0; x < state.width; x++) {
@@ -13,14 +14,13 @@ function processContinuousEnemyAI(playerObj, state, dt, isWallFunc) {
     }
 
     state.monsters.forEach((m) => {
-        // Inisialisasi variabel internal kecerdasan buatan (AI)
         if (m.wanderTimer === undefined) m.wanderTimer = 0;
         if (m.wanderTarget === undefined) m.wanderTarget = null;
         if (m.atkCooldown === undefined) m.atkCooldown = 0;
         if (m.healUses === undefined) m.healUses = 0;
         
         if (m.type === 'boss' && m.bossState === undefined) {
-            m.bossState = 'wander'; // 'wander', 'returning', 'idle'
+            m.bossState = 'wander'; 
             m.bossIdleTimer = 0;
             m.wanderCount = 0;
         }
@@ -33,7 +33,7 @@ function processContinuousEnemyAI(playerObj, state, dt, isWallFunc) {
         let aggroRange = diff > 3 ? 4.5 : 1.5; 
         let r = 0.35; 
 
-        // BOSS HEALING MECHANIC
+        // BOSS HEAL
         if (m.type === 'boss' && m.hp < m.maxHp * 0.7 && m.healUses < 3) {
             let bx = Math.round(m.x); let by = Math.round(m.y);
             if (bx >= 0 && bx < state.width && by >= 0 && by < state.height) {
@@ -47,7 +47,7 @@ function processContinuousEnemyAI(playerObj, state, dt, isWallFunc) {
             }
         }
 
-        // 1. AREA SERANGAN JARAK DEKAT
+        // 1. AREA SERANG
         if (!isUntargetable && distToPlayer <= 0.8) {
             if (m.atkCooldown <= 0) {
                 m.atkCooldown = 1.0; 
@@ -64,9 +64,16 @@ function processContinuousEnemyAI(playerObj, state, dt, isWallFunc) {
                     } else {
                         let reflectBuff = state.activeBuffs.find(b => b.isReflect);
                         if (reflectBuff && Math.random() < reflectBuff.reflectChance) {
-                            baseDmg = 0; m.hp -= mAtk; 
-                            showToast(playerObj, "REFLECT!", `Musuh kena ${mAtk} DMG`);
-                            if (m.hp <= 0) m.isDeadFlag = true;
+                            baseDmg = 0; 
+                            
+                            // FIX BUG: Cegah Boss Mati Konyol karena Reflect (Boss Wajib Ditebas Langsung!)
+                            if (m.type === 'boss') {
+                                m.hp = Math.max(1, m.hp - mAtk); 
+                            } else {
+                                m.hp -= mAtk;
+                                if (m.hp <= 0) m.isDeadFlag = true;
+                            }
+                            showToast(playerObj, "REFLECT!", `Musuh kena DMG`);
                         }
                     }
                 }
@@ -86,36 +93,38 @@ function processContinuousEnemyAI(playerObj, state, dt, isWallFunc) {
                 if (checkDeath(playerObj, state, m.name)) return;
             }
         } 
-        // 2. KONDISI LOGIKA MOVEMENT BOSS
+        // 2. BOSS AI
         else if (m.type === 'boss') {
             let bossAggro = Math.hypot(state.width, state.height) * 0.3;
             
             if (!isUntargetable && distToPlayer <= bossAggro) {
-                // Mengejar Pemain namun dilarang masuk ke area gembok/pintu keluar (radius 4.5 tile)
-                let dx = (px - m.x) / distToPlayer; let dy = (py - m.y) / distToPlayer;
-                let nextX = m.x + dx * speed; let nextY = m.y + dy * speed;
-                
-                if (Math.hypot(nextX - exitX, nextY - exitY) > 4.5) {
-                    if (!isWallFunc(state, nextX - r, m.y - r) && !isWallFunc(state, nextX + r, m.y - r) && !isWallFunc(state, nextX - r, m.y + r) && !isWallFunc(state, nextX + r, m.y + r)) m.x = nextX;
-                    if (!isWallFunc(state, m.x - r, nextY - r) && !isWallFunc(state, m.x + r, nextY - r) && !isWallFunc(state, m.x - r, nextY + r) && !isWallFunc(state, m.x + r, nextY + r)) m.y = nextY;
+                // FIX BUG NaN: Penjaga batas pembagian jika koordinat menyentuh bulat angka
+                if (distToPlayer > 0.05) {
+                    let dx = (px - m.x) / distToPlayer; let dy = (py - m.y) / distToPlayer;
+                    let nextX = m.x + dx * speed; let nextY = m.y + dy * speed;
+                    
+                    if (Math.hypot(nextX - exitX, nextY - exitY) > 4.5) {
+                        if (!isWallFunc(state, nextX - r, m.y - r) && !isWallFunc(state, nextX + r, m.y - r) && !isWallFunc(state, nextX - r, m.y + r) && !isWallFunc(state, nextX + r, m.y + r)) m.x = nextX;
+                        if (!isWallFunc(state, m.x - r, nextY - r) && !isWallFunc(state, m.x + r, nextY - r) && !isWallFunc(state, m.x - r, nextY + r) && !isWallFunc(state, m.x + r, nextY + r)) m.y = nextY;
+                    }
                 }
                 m.wanderTarget = null;
             } else {
-                // Algoritma Penjelajahan Seluruh Labirin bagi Boss
                 if (m.bossState === 'idle') {
                     m.bossIdleTimer -= dt;
                     if (m.bossIdleTimer <= 0) { m.bossState = 'wander'; m.wanderTarget = null; }
                 } 
                 else if (m.bossState === 'returning') {
-                    let distToOrigin = Math.hypot(m.originX - m.x, m.originY - m.y);
-                    if (distToOrigin < 0.25) {
+                    if (distFromOrigin < 0.25) {
                         m.bossState = 'idle';
-                        m.bossIdleTimer = 15 + Math.random() * 15; // Berdiam diri selama 15-30 detik
+                        m.bossIdleTimer = 15 + Math.random() * 15;
                     } else {
-                        let dx = (m.originX - m.x) / distToOrigin; let dy = (m.originY - m.y) / distToOrigin;
-                        let nextX = m.x + dx * speed; let nextY = m.y + dy * speed;
-                        if (!isWallFunc(state, nextX - r, m.y - r) && !isWallFunc(state, nextX + r, m.y - r) && !isWallFunc(state, nextX - r, m.y + r) && !isWallFunc(state, nextX + r, m.y + r)) m.x = nextX;
-                        if (!isWallFunc(state, m.x - r, nextY - r) && !isWallFunc(state, m.x + r, nextY - r) && !isWallFunc(state, m.x - r, nextY + r) && !isWallFunc(state, m.x + r, nextY + r)) m.y = nextY;
+                        if (distFromOrigin > 0.05) {
+                            let dx = (m.originX - m.x) / distFromOrigin; let dy = (m.originY - m.y) / distFromOrigin;
+                            let nextX = m.x + dx * speed; let nextY = m.y + dy * speed;
+                            if (!isWallFunc(state, nextX - r, m.y - r) && !isWallFunc(state, nextX + r, m.y - r) && !isWallFunc(state, nextX - r, m.y + r) && !isWallFunc(state, nextX + r, m.y + r)) m.x = nextX;
+                            if (!isWallFunc(state, m.x - r, nextY - r) && !isWallFunc(state, m.x + r, nextY - r) && !isWallFunc(state, m.x - r, nextY + r) && !isWallFunc(state, m.x + r, nextY + r)) m.y = nextY;
+                        }
                     }
                 } 
                 else if (m.bossState === 'wander') {
@@ -123,7 +132,6 @@ function processContinuousEnemyAI(playerObj, state, dt, isWallFunc) {
                         let openTiles = [];
                         for (let y = 1; y < state.height - 1; y++) {
                             for (let x = 1; x < state.width - 1; x++) {
-                                // Menjelajahi seluruh jalan terbuka kecuali radius 4.5 dari gembok pintu
                                 if (state.maze[y][x] === 0 && Math.hypot(x - exitX, y - exitY) > 4.5) {
                                     openTiles.push({x, y});
                                 }
@@ -138,26 +146,28 @@ function processContinuousEnemyAI(playerObj, state, dt, isWallFunc) {
                     }
                     if (m.wanderTarget) {
                         let wDist = Math.hypot(m.wanderTarget.x - m.x, m.wanderTarget.y - m.y);
-                        let dx = (m.wanderTarget.x - m.x) / wDist; let dy = (m.wanderTarget.y - m.y) / wDist;
-                        let nextX = m.x + dx * speed; let nextY = m.y + dy * speed;
-                        if (!isWallFunc(state, nextX - r, m.y - r) && !isWallFunc(state, nextX + r, m.y - r) && !isWallFunc(state, nextX - r, m.y + r) && !isWallFunc(state, nextX + r, m.y + r)) m.x = nextX;
-                        if (!isWallFunc(state, m.x - r, nextY - r) && !isWallFunc(state, m.x + r, nextY - r) && !isWallFunc(state, m.x - r, nextY + r) && !isWallFunc(state, m.x + r, nextY + r)) m.y = nextY;
+                        if (wDist > 0.05) {
+                            let dx = (m.wanderTarget.x - m.x) / wDist; let dy = (m.wanderTarget.y - m.y) / wDist;
+                            let nextX = m.x + dx * speed; let nextY = m.y + dy * speed;
+                            if (!isWallFunc(state, nextX - r, m.y - r) && !isWallFunc(state, nextX + r, m.y - r) && !isWallFunc(state, nextX - r, m.y + r) && !isWallFunc(state, nextX + r, m.y + r)) m.x = nextX;
+                            if (!isWallFunc(state, m.x - r, nextY - r) && !isWallFunc(state, m.x + r, nextY - r) && !isWallFunc(state, m.x - r, nextY + r) && !isWallFunc(state, m.x + r, nextY + r)) m.y = nextY;
+                        }
                     }
                 }
             }
         } 
-        // 3. KONDISI LOGIKA MOVEMENT MUSUH BIASA
+        // 3. NORMAL MONSTER AI
         else {
-            // Pengecekan Chasing: Maksimal 2x radius deteksi dari titik awal spawn
             if (!isUntargetable && distToPlayer <= aggroRange && distFromOrigin <= aggroRange * 2) {
-                let dx = (px - m.x) / distToPlayer; let dy = (py - m.y) / distToPlayer;
-                let nextX = m.x + dx * speed; let nextY = m.y + dy * speed;
-                
-                if (!isWallFunc(state, nextX - r, m.y - r) && !isWallFunc(state, nextX + r, m.y - r) && !isWallFunc(state, nextX - r, m.y + r) && !isWallFunc(state, nextX + r, m.y + r)) m.x = nextX;
-                if (!isWallFunc(state, m.x - r, nextY - r) && !isWallFunc(state, m.x + r, nextY - r) && !isWallFunc(state, m.x - r, nextY + r) && !isWallFunc(state, m.x + r, nextY + r)) m.y = nextY;
+                if (distToPlayer > 0.05) {
+                    let dx = (px - m.x) / distToPlayer; let dy = (py - m.y) / distToPlayer;
+                    let nextX = m.x + dx * speed; let nextY = m.y + dy * speed;
+                    
+                    if (!isWallFunc(state, nextX - r, m.y - r) && !isWallFunc(state, nextX + r, m.y - r) && !isWallFunc(state, nextX - r, m.y + r) && !isWallFunc(state, nextX + r, m.y + r)) m.x = nextX;
+                    if (!isWallFunc(state, m.x - r, nextY - r) && !isWallFunc(state, m.x + r, nextY - r) && !isWallFunc(state, m.x - r, nextY + r) && !isWallFunc(state, m.x + r, nextY + r)) m.y = nextY;
+                }
                 m.wanderTarget = null;
             } 
-            // Pengecekan Wandering: Hanya sejauh 1x radius deteksi dari asal spawn
             else {
                 if (!m.wanderTarget || Math.hypot(m.wanderTarget.x - m.x, m.wanderTarget.y - m.y) < 0.2) {
                     m.wanderTimer -= dt;
@@ -180,15 +190,19 @@ function processContinuousEnemyAI(playerObj, state, dt, isWallFunc) {
                 }
                 if (m.wanderTarget) {
                     let wDist = Math.hypot(m.wanderTarget.x - m.x, m.wanderTarget.y - m.y);
-                    let dx = (m.wanderTarget.x - m.x) / wDist; let dy = (m.wanderTarget.y - m.y) / wDist;
-                    let nextX = m.x + dx * (speed * 0.45); let nextY = m.y + dy * (speed * 0.45);
-                    
-                    if (!isWallFunc(state, nextX - r, m.y - r) && !isWallFunc(state, nextX + r, m.y - r) && !isWallFunc(state, nextX - r, m.y + r) && !isWallFunc(state, nextX + r, m.y + r)) m.x = nextX;
-                    if (!isWallFunc(state, m.x - r, nextY - r) && !isWallFunc(state, m.x + r, nextY - r) && !isWallFunc(state, m.x - r, nextY + r) && !isWallFunc(state, m.x + r, nextY + r)) m.y = nextY;
+                    // FIX BUG: Mencegah musuh biasa lenyap akibat jarak yang terlampau dekat (NaN state)
+                    if (wDist > 0.05) {
+                        let dx = (m.wanderTarget.x - m.x) / wDist; let dy = (m.wanderTarget.y - m.y) / wDist;
+                        let nextX = m.x + dx * (speed * 0.45); let nextY = m.y + dy * (speed * 0.45);
+                        
+                        if (!isWallFunc(state, nextX - r, m.y - r) && !isWallFunc(state, nextX + r, m.y - r) && !isWallFunc(state, nextX - r, m.y + r) && !isWallFunc(state, nextX + r, m.y + r)) m.x = nextX;
+                        if (!isWallFunc(state, m.x - r, nextY - r) && !isWallFunc(state, m.x + r, nextY - r) && !isWallFunc(state, m.x - r, nextY + r) && !isWallFunc(state, m.x + r, nextY + r)) m.y = nextY;
+                    }
                 }
             }
         }
         m.visualX = m.x; m.visualY = m.y;
     });
+    
     state.monsters = state.monsters.filter(m => !m.isDeadFlag);
 }

@@ -1,9 +1,10 @@
 function getMaxHpCap(state) {
-  if (state && state.maxHp) return state.maxHp;
   let diff = window.GameConfig.diff || 3;
-  if (diff > 4) return 200;
-  if (diff > 2) return 500;
-  return 1000;
+  let baseMax = (state && state.maxHp) ? state.maxHp : 100;
+  
+  if (diff > 4) return baseMax + 200;
+  if (diff > 2) return baseMax + 500;
+  return baseMax + 900;
 }
 
 function showToast(playerObj, title, message) {
@@ -76,8 +77,13 @@ function updateStatsUI(playerObj) {
   document.getElementById(`p${playerObj}-shield`).innerText = state.shield;
   document.getElementById(`p${playerObj}-atk`).innerText = state.atk;
   document.getElementById(`p${playerObj}-def`).innerText = state.def;
-  document.getElementById(`p${playerObj}-stage`).innerText = state.stage;
-  document.getElementById(`p${playerObj}-score`).innerText = state.score;
+  
+  // Mencegah error jika elemen p1-stage/p2-stage dihapus dari kontrol panel
+  let stageEl = document.getElementById(`p${playerObj}-stage`);
+  if (stageEl) stageEl.innerText = state.stage;
+  
+  let scoreEl = document.getElementById(`p${playerObj}-score`);
+  if (scoreEl) scoreEl.innerText = state.score;
   
   let hd = document.getElementById(`header-p${playerObj}-stage`);
   if (hd) hd.innerText = `[St.${state.stage}]`;
@@ -96,31 +102,32 @@ function updateStatsUI(playerObj) {
   let maxInv = (28 - (diff * 4)) + (state.maxInvBonus || 0);
   let currentItemsCount = state.inventory.filter(i => i !== 'key').length;
 
-  // Update Teks Judul Kapasitas Tas di Elemen Overlay H4
   let tagElements = document.querySelectorAll(`#inv-p${playerObj} h4`);
   if (tagElements.length > 0) {
-      let pLabel = playerObj == 1 ? window.p1State.name : window.p2State.name;
-      tagElements[0].innerHTML = `🎒 TAS ${pLabel} (${currentItemsCount}/${maxInv})`;
+    let pLabel = playerObj == 1 ? window.p1State.name : window.p2State.name;
+    tagElements[0].innerHTML = `🎒 TAS <span class="p-name-tag p${playerObj}-tag-name">${pLabel}</span> (${currentItemsCount}/${maxInv})`;
   }
   
   if (state.inventory.length === 0) {
     invContainer.innerHTML = '<p style="color:#aaa; width:100%; text-align:center; grid-column: span 4; font-size:0.55rem; padding: 20px 0;">Tas Kosong</p>';
   } else {
     state.inventory.forEach((itemId, index) => {
-      let btn = document.createElement('button');
-      btn.className = 'inv-item-btn action-use-item';
-      btn.dataset.player = playerObj;
-      btn.dataset.index = index;
-      
-      if (itemId === 'key') {
-        btn.innerHTML = `🔑<br><small>Kunci</small>`;
-      } else {
-        let d = window.ITEM_DB[itemId];
-        btn.innerHTML = `${d.emoji}<br><small>${d.name}</small>`;
-        if (state.isPaused && state.hp === 1 && (d.type === 'heal' || d.type === 'shield')) btn.classList.add('highlight-heal');
-      }
-      invContainer.appendChild(btn);
-    });
+        let btn = document.createElement('button');
+        btn.className = 'inv-item-btn action-use-item';
+        btn.dataset.player = playerObj;
+        btn.dataset.index = index;
+        
+        btn.onclick = () => { useItem(playerObj, index); };
+        
+        if (itemId === 'key') {
+          btn.innerHTML = `🔑<br><small>Kunci</small>`;
+        } else {
+          let d = window.ITEM_DB[itemId];
+          btn.innerHTML = `${d.emoji}<br><small>${d.name}</small>`;
+          if (state.isPaused && state.hp === 1 && (d.type === 'heal' || d.type === 'shield')) btn.classList.add('highlight-heal');
+        }
+        invContainer.appendChild(btn);
+      });
   }
 }
 

@@ -212,14 +212,31 @@
         <div class="game-header">
             <button class="btn-back-slim">Keluar</button>
             <div class="score-timer">
-                <span id="score-p1-wrap" style="color:#3498db;">P1 <span id="header-p1-stage" style="color:#fff; font-size:0.5rem;">[St.1]</span> : <span id="p1-score">0</span></span>
-                <span id="game-timer" style="color:#f1c40f;">00:00</span>
-                <span id="score-p2-wrap" style="color:#2ecc71;">P2 <span id="header-p2-stage" style="color:#fff; font-size:0.5rem;">[St.1]</span> : <span id="p2-score">0</span></span>
+                <div id="score-p1-wrap" class="player-badge p1-badge">
+                    <div class="badge-name">P1 <span id="header-p1-stage" class="badge-stage">[St.1]</span></div>
+                    <div class="badge-score">🏆 <span id="p1-score">0</span></div>
+                </div>
+                
+                <div class="timer-badge">
+                    <span id="game-timer">00:00</span>
+                </div>
+                
+                <div id="score-p2-wrap" class="player-badge p2-badge">
+                    <div class="badge-name"><span id="header-p2-stage" class="badge-stage">[St.1]</span> P2</div>
+                    <div class="badge-score"><span id="p2-score">0</span> 🏆</div>
+                </div>
             </div>
         </div>
         
         <div class="split-screen">
             <div class="player-screen" id="p1-screen">
+                <div id="upgrade-overlay-p1" class="upgrade-overlay hidden">
+                    <div class="upgrade-card glass-panel glow-green">
+                        <h2 class="neon-yellow" style="font-size: 0.8rem; margin-bottom: 10px;">👹 BOSS DEFEATED!</h2>
+                        <div id="upgrade-list-p1" class="upgrade-list"></div>
+                        <button class="btn-close-upgrade arcade-btn" data-player="1">LANJUTKAN ➡️</button>
+                    </div>
+                </div>
                 <div id="dead-overlay-p1" class="dead-overlay hidden">
                     <h2>GUGUR</h2>
                     <p>Menunggu Player 2...</p>
@@ -264,7 +281,6 @@
                         <div class="stats-grid">
                             <div class="stat-box" title="Attack">⚔️ <span id="p1-atk">15</span></div>
                             <div class="stat-box" title="Defense">🛡️ <span id="p1-def">5</span></div>
-                            <div class="stat-box" title="Stage">🏁 <span id="p1-stage">1</span></div>
                         </div>
                         <div class="info-row" id="p1-buffs" style="display:flex; align-items:center; gap:2px; height: 26px;">-</div>
                     </div>
@@ -278,13 +294,20 @@
             </div>
             
             <div class="player-screen" id="p2-screen">
+                <div id="upgrade-overlay-p2" class="upgrade-overlay hidden">
+                    <div class="upgrade-card glass-panel glow-green">
+                        <h2 class="neon-yellow" style="font-size: 0.8rem; margin-bottom: 10px;">👹 BOSS DEFEATED!</h2>
+                        <div id="upgrade-list-p2" class="upgrade-list"></div>
+                        <button class="btn-close-upgrade arcade-btn" data-player="2">LANJUTKAN ➡️</button>
+                    </div>
+                </div>
                 <div id="dead-overlay-p2" class="dead-overlay hidden">
                     <h2>GUGUR</h2>
                     <p>Menunggu Player 1...</p>
                 </div>
                 
                 <div id="inv-p2" class="inv-overlay hidden">
-                    <h4 style="color:#3498db;">🎒 TAS <span class="p-name-tag p2-tag-name">p2</span></h4>
+                    <h4 style="color:#3498db;">🎒 TAS <span class="p-name-tag p2-tag-name">P2</span></h4>
                     <div id="inv-list-p2" class="inv-grid"></div>
                     <button class="action-inv btn-modal cancel" data-player="2" style="margin-top: 15px;">TUTUP TAS</button>
                 </div>
@@ -322,7 +345,6 @@
                         <div class="stats-grid">
                             <div class="stat-box" title="Attack">⚔️ <span id="p2-atk">15</span></div>
                             <div class="stat-box" title="Defense">🛡️ <span id="p2-def">5</span></div>
-                            <div class="stat-box" title="Stage">🏁 <span id="p2-stage">1</span></div>
                         </div>
                         <div class="info-row" id="p2-buffs" style="display:flex; align-items:center; gap:2px; height: 26px;">-</div>
                     </div>
@@ -337,21 +359,11 @@
         </div>
     </div>
 
-    <div id="modal-upgrade" class="modal hidden" style="z-index: 1005;">
-        <div class="modal-content glass-panel glow-green" style="text-align: center; width: 90%; max-width: 420px;">
-            <h2 class="neon-yellow" style="font-size: 0.9rem; margin-bottom: 15px; letter-spacing: 1px;">👹 BOSS DEFEATED! STATUS UPGRADED!</h2>
-            <p style="color:#aaa; font-size:0.55rem; margin-bottom: 20px;">Kekuatan kegelapan hancur, status dasarmu meningkat!</p>
-            <div id="upgrade-list" style="text-align: left; font-size: 0.65rem; margin-bottom: 25px; line-height: 2; color:#fff; background: rgba(0,0,0,0.4); padding: 12px; border-radius: 8px; border: 1px solid #444;">
-                </div>
-            <button id="btn-close-upgrade" class="btn-menu arcade-btn" style="background:#27ae60; width:100%; padding: 12px;">LANJUTKAN PETUALANGAN ➡️</button>
-        </div>
-    </div>
-    
     <script src="materials.js"></script>
     <script src="quiz.js"></script>
     <script src="mazeEngine.js"></script>
     
-    <script src="itemManagement.js"></script>
+    <script src="database.js"></script> <script src="itemManagement.js"></script>
     <script src="gameRendering.js"></script>
     <script src="enemyAI.js"></script>
     <script src="inputHandling.js"></script>
