@@ -177,29 +177,35 @@
     </div>
     
     <div id="screen-gameover" class="screen hidden">
-        <h1 class="game-title neon-red" style="margin-bottom: 5px;">GAME OVER</h1>
-        <h2 id="gameover-winner" class="neon-yellow" style="margin-bottom: 30px; font-size: clamp(1rem, 4vw, 2.5rem);">WINNER!</h2>
+        <h1 class="game-title neon-red" style="margin-bottom: 5px; font-size: clamp(1.5rem, 5vw, 3rem);">SESI SELESAI</h1>
+        <h2 id="gameover-winner" class="neon-yellow" style="margin-bottom: 25px; font-size: clamp(1rem, 3.5vw, 2rem); text-align: center; line-height: 1.4;">WINNER!</h2>
         
-        <div class="gameover-stats-container">
-            <div id="go-card-p1" class="gameover-card glass-panel glow-blue">
-                <h3 id="go-p1-name" style="color:#3498db;">PLAYER 1</h3>
-                <p>Skor Akhir: <span id="go-p1-score">0</span></p>
-                <p>Stage Dicapai: <span id="go-p1-stage">1</span></p>
-                <p>Musuh Dibunuh: <span id="go-p1-kills">0</span></p>
-                <p>Damage Diberikan: <span id="go-p1-dmgDealt" style="color:#2ecc71;">0</span></p>
-                <p>Damage Diterima: <span id="go-p1-dmgTaken" style="color:#e74c3c;">0</span></p>
+        <div class="gameover-stats-container" style="display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; width: 90%; max-width: 800px; margin: 0 auto;">
+            
+            <div id="go-card-p1" class="gameover-card glass-panel glow-blue" style="flex: 1; min-width: 260px; padding: 15px; border-radius: 8px;">
+                <h3 id="go-p1-name" style="color:#3498db; border-bottom: 2px dashed #3498db; padding-bottom: 5px; margin-bottom: 10px; font-size: 0.8rem;">PLAYER 1</h3>
+                <div style="font-size: 0.65rem; text-align: left; line-height: 1.8;">
+                    <p>🏆 Skor Akhir: <span id="go-p1-score" style="color: #f1c40f;">0</span></p>
+                    <p>🏁 Stage Dicapai: <span id="go-p1-stage">1</span></p>
+                    <p>💀 Musuh Dikalahkan: <span id="go-p1-kills">0</span></p>
+                    <p>⚔️ Damage Diberikan: <span id="go-p1-dmgDealt" style="color:#2ecc71;">0</span></p>
+                    <p>🛡️ Damage Diterima: <span id="go-p1-dmgTaken" style="color:#e74c3c;">0</span></p>
+                </div>
             </div>
             
-            <div id="go-card-p2" class="gameover-card glass-panel glow-green">
-                <h3 id="go-p2-name" style="color:#2ecc71;">PLAYER 2</h3>
-                <p>Skor Akhir: <span id="go-p2-score">0</span></p>
-                <p>Stage Dicapai: <span id="go-p2-stage">1</span></p>
-                <p>Musuh Dibunuh: <span id="go-p2-kills">0</span></p>
-                <p>Damage Diberikan: <span id="go-p2-dmgDealt" style="color:#2ecc71;">0</span></p>
-                <p>Damage Diterima: <span id="go-p2-dmgTaken" style="color:#e74c3c;">0</span></p>
+            <div id="go-card-p2" class="gameover-card glass-panel glow-green" style="flex: 1; min-width: 260px; padding: 15px; border-radius: 8px;">
+                <h3 id="go-p2-name" style="color:#2ecc71; border-bottom: 2px dashed #2ecc71; padding-bottom: 5px; margin-bottom: 10px; font-size: 0.8rem;">PLAYER 2</h3>
+                <div style="font-size: 0.65rem; text-align: left; line-height: 1.8;">
+                    <p>🏆 Skor Akhir: <span id="go-p2-score" style="color: #f1c40f;">0</span></p>
+                    <p>🏁 Stage Dicapai: <span id="go-p2-stage">1</span></p>
+                    <p>💀 Musuh Dikalahkan: <span id="go-p2-kills">0</span></p>
+                    <p>⚔️ Damage Diberikan: <span id="go-p2-dmgDealt" style="color:#2ecc71;">0</span></p>
+                    <p>🛡️ Damage Diterima: <span id="go-p2-dmgTaken" style="color:#e74c3c;">0</span></p>
+                </div>
             </div>
+            
         </div>
-        <button id="btn-home-gameover" class="btn-menu arcade-btn" style="margin-top: 35px; width: 80%; max-width: 400px;">KEMBALI KE MENU</button>
+        <button id="btn-home-gameover" class="btn-menu arcade-btn" style="margin-top: 35px; width: 80%; max-width: 400px; padding: 12px;">KEMBALI KE MENU UTAMA</button>
     </div>
 
     <div id="screen-game" class="screen hidden">

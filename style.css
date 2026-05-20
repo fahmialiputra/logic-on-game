@@ -1,7 +1,3 @@
-/* ========================================================= */
-/* --- REDESIGN VISUAL MODERN (ARCADE / CYBERPUNK THEME) --- */
-/* ========================================================= */
-
 * { 
     margin: 0; padding: 0; box-sizing: border-box; 
     user-select: none; -webkit-user-select: none; 
@@ -22,7 +18,15 @@ html, body {
 .blink-text { animation: blink 1.5s infinite; color: #fff; }
 @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
 
-.neon-blue { text-shadow: 0 0 10px #3498db, 0 0 20px #2980b9; color: #fff; }
+/* .neon-blue { text-shadow: 0 0 10px #3498db, 0 0 20px #2980b9; color: #fff; } */
+.neon-green {
+    color: #2ecc71;
+    text-shadow: 0 0 8px rgba(46, 204, 113, 0.6);
+}
+.neon-blue {
+    color: #3498db;
+    text-shadow: 0 0 8px rgba(52, 152, 219, 0.6);
+}
 .neon-yellow { text-shadow: 0 0 10px #f1c40f, 0 0 20px #e67e22; color: #fff; }
 .neon-red { text-shadow: 0 0 10px #e74c3c, 0 0 20px #c0392b; color: #fff; }
 

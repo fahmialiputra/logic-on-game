@@ -14,45 +14,66 @@ function saveToLeaderboard(name, score, stage) {
 
 function triggerGameOver() {
     window.isGameActive = false;
-    clearInterval(window.gameInterval); clearInterval(window.enemyInterval);
+    
+    // Bersihkan semua interval game & musuh secara menyeluruh
+    if (window.gameInterval) { clearInterval(window.gameInterval); window.gameInterval = null; }
+    if (window.enemyInterval) { clearInterval(window.enemyInterval); window.enemyInterval = null; }
+    if (window.deathTimeout) { clearTimeout(window.deathTimeout); window.deathTimeout = null; }
     
     let isSingle = window.GameConfig.players === 1;
-    let n1 = window.p1State.name; let s1 = window.p1State.score;
-    let n2 = isSingle ? "" : window.p2State.name; 
-    let s2 = isSingle ? 0 : window.p2State.score;
+    let mode = window.GameConfig.mode;
+    let n1 = window.p1State.name || 'PLAYER 1'; 
+    let s1 = window.p1State.score || 0;
+    let n2 = isSingle ? "" : (window.p2State.name || 'PLAYER 2'); 
+    let s2 = isSingle ? 0 : (window.p2State.score || 0);
     
-    let winnerText = "GAME SELESAI!";
-    if (!isSingle) {
-        winnerText = "DRAW!";
-        if (s1 > s2) winnerText = `${n1} WIN!`;
-        else if (s2 > s1) winnerText = `${n2} WIN!`;
-    }
+    // Teks info mode permainan untuk header Game Over
+    let modeText = "MODE: " + mode.toUpperCase().replace('-', ' ');
+    document.getElementById('gameover-winner').innerHTML = `<span style="font-size:0.65rem; display:block; color:#aaa; margin-bottom:5px;">${modeText}</span>`;
 
-    document.getElementById('gameover-winner').innerText = winnerText;
+    // Penentuan teks kemenangan berdasarkan Mode dan Jumlah Pemain
+    if (isSingle) {
+        if (mode === 'speedrun' && window.p1State.stage >= window.GameConfig.maxStage) {
+            document.getElementById('gameover-winner').innerHTML += `<span class="neon-green">SPEEDRUN COMPLETED!</span>`;
+        } else {
+            document.getElementById('gameover-winner').innerHTML += `<span class="neon-red">GAME OVER</span>`;
+        }
+    } else {
+        // Mode Versus (2 Player)
+        if (s1 > s2) {
+            document.getElementById('gameover-winner').innerHTML += `<span class="neon-blue">${n1} WINS!</span>`;
+        } else if (s2 > s1) {
+            document.getElementById('gameover-winner').innerHTML += `<span class="neon-green">${n2} WINS!</span>`;
+        } else {
+            document.getElementById('gameover-winner').innerHTML += `<span class="neon-yellow">DRAW / SERI!</span>`;
+        }
+    }
     
-    // P1 Stats
+    // Tampilkan & Update Data Statistik P1
     document.getElementById('go-p1-name').innerText = n1;
     document.getElementById('go-p1-score').innerText = s1;
     document.getElementById('go-p1-stage').innerText = window.p1State.stage;
-    document.getElementById('go-p1-kills').innerText = window.p1State.stats.kills;
-    document.getElementById('go-p1-dmgDealt').innerText = window.p1State.stats.dmgDealt;
-    document.getElementById('go-p1-dmgTaken').innerText = window.p1State.stats.dmgTaken;
+    document.getElementById('go-p1-kills').innerText = window.p1State.stats ? window.p1State.stats.kills : 0;
+    document.getElementById('go-p1-dmgDealt').innerText = window.p1State.stats ? window.p1State.stats.dmgDealt : 0;
+    document.getElementById('go-p1-dmgTaken').innerText = window.p1State.stats ? window.p1State.stats.dmgTaken : 0;
     saveToLeaderboard(n1, s1, window.p1State.stage);
 
+    // Atur Tampilan Kartu P2 berdasarkan jumlah pemain
     let goCardP2 = document.getElementById('go-card-p2');
     if (!isSingle) {
-        goCardP2.classList.remove('hidden');
+        goCardP2.style.display = 'block';
         document.getElementById('go-p2-name').innerText = n2;
         document.getElementById('go-p2-score').innerText = s2;
         document.getElementById('go-p2-stage').innerText = window.p2State.stage;
-        document.getElementById('go-p2-kills').innerText = window.p2State.stats.kills;
-        document.getElementById('go-p2-dmgDealt').innerText = window.p2State.stats.dmgDealt;
-        document.getElementById('go-p2-dmgTaken').innerText = window.p2State.stats.dmgTaken;
+        document.getElementById('go-p2-kills').innerText = window.p2State.stats ? window.p2State.stats.kills : 0;
+        document.getElementById('go-p2-dmgDealt').innerText = window.p2State.stats ? window.p2State.stats.dmgDealt : 0;
+        document.getElementById('go-p2-dmgTaken').innerText = window.p2State.stats ? window.p2State.stats.dmgTaken : 0;
         saveToLeaderboard(n2, s2, window.p2State.stage);
     } else {
-        goCardP2.classList.add('hidden');
+        goCardP2.style.display = 'none';
     }
 
+    // Navigasi Layar
     document.getElementById('screen-game').classList.add('hidden');
     document.getElementById('custom-modal').classList.add('hidden'); 
     document.getElementById('screen-gameover').classList.remove('hidden');

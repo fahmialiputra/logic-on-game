@@ -181,18 +181,25 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   
   document.querySelectorAll('.btn-back, .btn-back-slim').forEach(btn => {
-    btn.addEventListener('pointerdown', (e) => {
-      if (e.target.closest('#screen-game')) {
-        window.CustomDialog.confirm("Keluar dari game? Progress tidak akan disimpan.", "KELUAR?", () => {
-          if (window.gameInterval) clearInterval(window.gameInterval);
-          if (window.enemyInterval) clearInterval(window.enemyInterval);
-          if (window.deathTimeout) clearTimeout(window.deathTimeout); // <- TAMBAHAN BARU
-          
-          window.isGameActive = false;
-          switchScreen('menu');
-        });
-      } else switchScreen('menu');
-    });
+      btn.addEventListener('pointerdown', (e) => {
+        if (e.target.closest('#screen-game')) {
+          window.CustomDialog.confirm("Keluar dari game? Progress tidak akan disimpan.", "KELUAR?", () => {
+            window.isGameActive = false;
+            
+            if (window.gameInterval) { clearInterval(window.gameInterval); window.gameInterval = null; }
+            if (window.enemyInterval) { clearInterval(window.enemyInterval); window.enemyInterval = null; }
+            if (window.deathTimeout) { clearTimeout(window.deathTimeout); window.deathTimeout = null; }
+            
+            // Reset visibilitas komponen UI overlay
+            document.getElementById('dead-overlay-p1').classList.add('hidden');
+            document.getElementById('dead-overlay-p2').classList.add('hidden');
+            document.getElementById('inv-p1').classList.add('hidden');
+            document.getElementById('inv-p2').classList.add('hidden');
+            
+            switchScreen('menu');
+          });
+        } else switchScreen('menu');
+      });
   });
   
   const modalSetting = document.getElementById('modal-setting');
