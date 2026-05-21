@@ -86,9 +86,16 @@ function renderMaze(ctx, maze, width, height, theme, pState) {
 
             if (cell === 1) {
                 ctx.fillStyle = theme === 'jungle' ? '#228B22' : '#5D4037';
-                ctx.fillRect(drawX, drawY, Math.ceil(cellSize), Math.ceil(cellSize));
+                ctx.beginPath();
+                if (ctx.roundRect) {
+                    ctx.roundRect(drawX, drawY, Math.ceil(cellSize), Math.ceil(cellSize), cellSize * 0.25);
+                } else {
+                    ctx.rect(drawX, drawY, Math.ceil(cellSize), Math.ceil(cellSize));
+                }
+                ctx.fill();
                 ctx.strokeStyle = 'rgba(0,0,0,0.3)';
-                ctx.strokeRect(drawX, drawY, Math.ceil(cellSize), Math.ceil(cellSize));
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
             } else if(cell === 3) {
                 let imgDoor = pState && pState.hasKey ? assets['door_open'] : assets['door_closed'];
                 if(imgDoor) ctx.drawImage(imgDoor, drawX, drawY, cellSize, cellSize);
@@ -118,16 +125,37 @@ function renderMaze(ctx, maze, width, height, theme, pState) {
             else { ctx.font = `${(m.type === 'boss') ? cellSize : cellSize * 0.7}px Arial`; ctx.fillText(m.emoji, mCenterX, mCenterY); }
             
             let hpView = window.GameConfig.enemyHpView || 'angka';
-            if (hpView === 'angka') {
+            
+            if (hpView === 'angka' && m.type !== 'boss') {
                 ctx.font = `bold ${cellSize * 0.25}px Arial`; ctx.fillStyle = '#ff4d4d';
-                ctx.fillText(`${m.hp}`, mCenterX, mCenterY - (cellSize * 0.45)); 
-            } else if (hpView === 'bar') {
-                let barW = cellSize * 0.6; let barH = cellSize * 0.08;
-                let barX = mCenterX - barW / 2; let barY = mCenterY - (cellSize * 0.45);
+                ctx.fillText(`${Math.round(m.hp)}`, mCenterX, mCenterY - (cellSize * 0.45)); 
+            } 
+            else if (hpView === 'bar' || m.type === 'boss') {
+                let isBoss = m.type === 'boss';
+                let barW = isBoss ? cellSize * 1.4 : cellSize * 0.6; 
+                let barH = isBoss ? cellSize * 0.15 : cellSize * 0.08;
+                let barX = mCenterX - barW / 2; 
+                let barY = mCenterY - (drawSize / 2) - (cellSize * 0.2);
                 let pct = Math.max(0, Math.min(1, m.hp / (m.maxHp || m.hp)));
-                ctx.fillStyle = '#4a1212'; ctx.fillRect(barX, barY, barW, barH);
-                ctx.fillStyle = pct > 0.35 ? '#2ecc71' : '#e74c3c'; ctx.fillRect(barX, barY, barW * pct, barH);
-                ctx.strokeStyle = '#000'; ctx.lineWidth = 1; ctx.strokeRect(barX, barY, barW, barH);
+                
+                // Latar belakang bar
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.8)'; 
+                ctx.fillRect(barX, barY, barW, barH);
+                
+                // Isi Bar (Warna gradient merah untuk boss, warna dinamis untuk musuh biasa)
+                if (isBoss) {
+                    let grad = ctx.createLinearGradient(barX, barY, barX + barW, barY);
+                    grad.addColorStop(0, '#8b0000'); grad.addColorStop(1, '#e74c3c');
+                    ctx.fillStyle = grad;
+                } else {
+                    ctx.fillStyle = pct > 0.35 ? '#2ecc71' : '#e74c3c'; 
+                }
+                ctx.fillRect(barX, barY, barW * pct, barH);
+                
+                // Bingkai (Emas dan tebal untuk boss)
+                ctx.strokeStyle = isBoss ? '#f1c40f' : '#000'; 
+                ctx.lineWidth = isBoss ? 2 : 1; 
+                ctx.strokeRect(barX, barY, barW, barH);
             }
         });
     }

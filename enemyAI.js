@@ -60,8 +60,25 @@ function processContinuousEnemyAI(playerObj, state, dt, isWallFunc) {
 
         let dbE = window.ENEMY_DB[m.type] || window.ENEMY_DB['beast'];
         let speed = dbE.speed * dt;
-        let aggroRange = diff > 3 ? 4.5 : 1.5;
+        let isRanged = dbE.isRanged || false;
+        let aggroRange = diff > 3 ? 4.5 : (isRanged ? 4.5 : 1.5);
         let r = 0.35;
+        let atkRange = isRanged ? 3.5 : 0.8;
+
+        // Cek Line of Sight khusus jika target berada dalam jangkauan ATK
+        let hasLOS = false;
+        if (distToPlayer <= atkRange) {
+            hasLOS = true;
+            let steps = Math.max(Math.ceil(distToPlayer * 3), 1);
+            for (let i = 1; i <= steps; i++) {
+                let cx = m.x + (px - m.x) * (i / steps);
+                let cy = m.y + (py - m.y) * (i / steps);
+                let rx = Math.round(cx); let ry = Math.round(cy);
+                if (rx >= 0 && rx < state.width && ry >= 0 && ry < state.height && state.maze[ry][rx] === 1) { 
+                    hasLOS = false; break; 
+                }
+            }
+        }
 
         // BOSS HEAL
         if (m.type === 'boss' && m.hp < m.maxHp * 0.7 && m.healUses < 3) {
@@ -78,7 +95,7 @@ function processContinuousEnemyAI(playerObj, state, dt, isWallFunc) {
         }
 
         // 1. AREA SERANG
-        if (!isUntargetable && distToPlayer <= 0.8) {
+        if (!isUntargetable && distToPlayer <= atkRange && hasLOS) {
             if (m.atkCooldown <= 0) {
                 m.atkCooldown = 1.0; 
                 let mAtk = m.atk;
@@ -227,7 +244,10 @@ function processContinuousEnemyAI(playerObj, state, dt, isWallFunc) {
         // 3. NORMAL MONSTER AI
         else {
             if (!isUntargetable && distToPlayer <= aggroRange && distFromOrigin <= aggroRange * 2) {
-                if (distToPlayer > 0.05) {
+                // Cegah monster maju menabrak pemain jika mereka adalah tipe ranged yang sudah dapat posisi tembak (LOS)
+                let shouldMove = !(isRanged && hasLOS && distToPlayer <= atkRange - 0.5);
+                
+                if (distToPlayer > 0.05 && shouldMove) {
                     let dx = (px - m.x) / distToPlayer; let dy = (py - m.y) / distToPlayer;
                     let nextX = m.x + dx * speed; let nextY = m.y + dy * speed;
                     

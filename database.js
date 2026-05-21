@@ -36,6 +36,10 @@ window.ENEMY_DB = {
     'beast': { emoji: '🐺', name: 'Werewolf', baseHp: 20, baseAtk: 8, baseDef: 1, diffHpBonus: 5, diffAtkBonus: 2, diffDefBonus: 1, speed: 1.8, atkEffect: '爪' },
     'slime': { emoji: '🦠', name: 'Slime', baseHp: 15, baseAtk: 5, baseDef: 3, diffHpBonus: 4, diffAtkBonus: 2, diffDefBonus: 1, speed: 1.2, atkEffect: '💦' },
     'skeleton': { emoji: '💀', name: 'Tengkorak', baseHp: 22, baseAtk: 12, baseDef: 1, diffHpBonus: 4, diffAtkBonus: 4, diffDefBonus: 2, speed: 1.6, atkEffect: '🦴' },
+    'spider_melee': { emoji: '🕷️', name: 'Laba-Laba', baseHp: 18, baseAtk: 9, baseDef: 1, diffHpBonus: 4, diffAtkBonus: 2, diffDefBonus: 1, speed: 2.0, atkEffect: '🕸️' },
+    'spider_ranged': { emoji: '🕸️', name: 'Spitter', baseHp: 15, baseAtk: 3, baseDef: 1, diffHpBonus: 3, diffAtkBonus: 1, diffDefBonus: 0, speed: 1.5, atkEffect: '💦', isRanged: true },
+    'skeleton_shield': { emoji: '🛡️', name: 'Tengkorak Elite', baseHp: 40, baseAtk: 3, baseDef: 5, diffHpBonus: 8, diffAtkBonus: 1, diffDefBonus: 3, speed: 1.2, atkEffect: '🦴' },
+    
     'boss': { emoji: '👹', name: 'Demon Lord', baseHp: 100, baseAtk: 25, baseDef: 0, diffHpBonus: 30, diffAtkBonus: 8, diffDefBonus: 3, speed: 1.4, atkEffect: '🔥' }
 };
 

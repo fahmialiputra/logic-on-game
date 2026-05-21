@@ -29,7 +29,7 @@ window.GameAssets = {
   }
 };
 
-window.GameConfig = { timer: 2, diff: 3, smooth: false, enemyHpView: 'angka', mode: 'time-trial', maxStage: 5, players: 2, orientation: 'auto' };
+window.GameConfig = { timer: 2, diff: 3, smooth: false, enemyHpView: 'angka', mode: 'time-trial', maxStage: 5, players: 2, orientation: 'auto', endlessLimitEnabled: false, endlessLimit: 1 };
 
 window.CustomDialog = {
   show: function(title, message, buttons) {
@@ -181,6 +181,9 @@ document.addEventListener('DOMContentLoaded', () => {
             let modalUpgrade = document.getElementById('modal-upgrade');
             if (modalUpgrade) modalUpgrade.classList.add('hidden');
             
+            let resUp1 = document.getElementById('resurrect-overlay-p1'); if (resUp1) resUp1.classList.add('hidden');
+            let resUp2 = document.getElementById('resurrect-overlay-p2'); if (resUp2) resUp2.classList.add('hidden');
+            
             switchScreen('menu');
           });
         } else switchScreen('menu');
@@ -206,6 +209,8 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
   });
+
+  document.getElementById('setting-endless-limit-val').addEventListener('input', (e) => { document.getElementById('endless-limit-val').innerText = e.target.value; });
   
   document.getElementById('btn-save-setting').addEventListener('pointerdown', () => {
     window.GameConfig.timer = parseInt(document.getElementById('setting-timer').value);
@@ -218,6 +223,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const orientRadio = document.querySelector('input[name="setting-orientation"]:checked');
     window.GameConfig.orientation = orientRadio ? orientRadio.value : 'auto';
+    
+    window.GameConfig.endlessLimitEnabled = document.getElementById('setting-limit-endless').checked;
+    window.GameConfig.endlessLimit = parseInt(document.getElementById('setting-endless-limit-val').value);
     
     modalSetting.classList.add('hidden');
     window.CustomDialog.alert("Konfigurasi berhasil diterapkan!", "BERHASIL");
@@ -273,5 +281,14 @@ document.addEventListener('DOMContentLoaded', () => {
   
   document.getElementById('btn-restart-p2')?.addEventListener('pointerdown', () => {
     if (typeof window.resetPlayerEndless === 'function') window.resetPlayerEndless(2);
+  });
+  // EVENT LISTENER RESURRECTION SPESIFIK
+  [1, 2].forEach(p => {
+    document.getElementById(`btn-resurrect-yes-p${p}`)?.addEventListener('pointerdown', () => {
+      if (typeof window[`resurrectActionYes${p}`] === 'function') window[`resurrectActionYes${p}`]();
+    });
+    document.getElementById(`btn-resurrect-no-p${p}`)?.addEventListener('pointerdown', () => {
+      if (typeof window[`resurrectActionNo${p}`] === 'function') window[`resurrectActionNo${p}`]();
+    });
   });
 });
