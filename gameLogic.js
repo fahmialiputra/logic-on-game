@@ -337,10 +337,12 @@ function populateEntities(state) {
             
             let tooClose = placedMonsters.some(m => Math.hypot(m.x - cell.x, m.y - cell.y) < 2.5);
             if (tooClose) continue;
-
+            
             placedMonsters.push(cell);
-            let isDark = Math.random() > 0.5;
-            let typeKey = isDark ? 'dark' : 'beast';
+            
+            // PENAMBAHAN JENIS MUSUH BARU
+            let normalEnemies = ['dark', 'beast', 'slime', 'skeleton'];
+            let typeKey = normalEnemies[Math.floor(Math.random() * normalEnemies.length)];
             let db = window.ENEMY_DB[typeKey];
             
             let baseHp = db.baseHp + (diff * db.diffHpBonus);
@@ -415,8 +417,15 @@ function handleStageClear(playerObj, state) {
     let isBossStage = state.stage % bossInterval === 0;
 
     if (isBossStage) {
-        state.height += 2;
-        state.width += (window.GameConfig.players === 1 ? 4 : 2); 
+        let orient = window.GameConfig.orientation || 'auto';
+        let isPortrait = orient === 'portrait' ? true : (orient === 'landscape' ? false : window.innerHeight > window.innerWidth);
+        
+        if (window.GameConfig.players === 1) {
+            if (isPortrait) { state.height += 4; state.width += 2; }
+            else { state.width += 4; state.height += 2; }
+        } else {
+            state.height += 2; state.width += 2;
+        }
         showToast(playerObj, "NEXT REALM", "Membuka Labirin yang Lebih Luas!");
     } else {
         showToast(playerObj, "STAGE CLEAR!", `Naik level!`);
@@ -440,10 +449,23 @@ function handleStageClear(playerObj, state) {
 
 function initGame(p1Name, p2Name) {
     let diff = window.GameConfig.diff || 3;
-    let height = 11 + ((diff - 1) * 2); 
-    let width = height;
+    let baseSize = 11 + ((diff - 1) * 2);
+    let height = baseSize;
+    let width = baseSize;
     
-    if (window.GameConfig.players === 1) { width = Math.floor(height * 1.6); if(width % 2 === 0) width++; }
+    // PEMBENTUKAN RASIO LABIRIN ADAPTIF UNTUK SOLO MODE
+    if (window.GameConfig.players === 1) {
+        let orient = window.GameConfig.orientation || 'auto';
+        let isPortrait = orient === 'portrait' ? true : (orient === 'landscape' ? false : window.innerHeight > window.innerWidth);
+        
+        if (isPortrait) {
+            height = Math.floor(baseSize * 1.6);
+            if (height % 2 === 0) height++;
+        } else {
+            width = Math.floor(baseSize * 1.6);
+            if (width % 2 === 0) width++;
+        }
+    }
 
     let screen1 = document.getElementById('p1-screen'); let screen2 = document.getElementById('p2-screen');
     let effectClasses = ['effect-invincible', 'effect-damage', 'effect-heal', 'effect-buff', 'effect-attack'];

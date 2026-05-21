@@ -29,7 +29,7 @@ window.GameAssets = {
   }
 };
 
-window.GameConfig = { timer: 2, diff: 3, smooth: false, enemyHpView: 'angka', mode: 'time-trial', maxStage: 5, players: 2 };
+window.GameConfig = { timer: 2, diff: 3, smooth: false, enemyHpView: 'angka', mode: 'time-trial', maxStage: 5, players: 2, orientation: 'auto' };
 
 window.CustomDialog = {
   show: function(title, message, buttons) {
@@ -216,6 +216,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const selectedRadio = document.querySelector('input[name="enemy-hp-view"]:checked');
     window.GameConfig.enemyHpView = selectedRadio ? selectedRadio.value : 'angka';
     
+    const orientRadio = document.querySelector('input[name="setting-orientation"]:checked');
+    window.GameConfig.orientation = orientRadio ? orientRadio.value : 'auto';
+    
     modalSetting.classList.add('hidden');
     window.CustomDialog.alert("Konfigurasi berhasil diterapkan!", "BERHASIL");
   });
@@ -225,7 +228,7 @@ document.addEventListener('DOMContentLoaded', () => {
     else document.exitFullscreen();
   });
   
-  document.getElementById('btn-start-game').addEventListener('pointerdown', () => {
+  document.getElementById('btn-start-game').addEventListener('pointerdown', async () => {
     const p1Name = document.getElementById('p1-name').value.trim() || 'PLAYER 1';
     const p2Name = document.getElementById('p2-name').value.trim() || 'PLAYER 2';
     const p1Tag = document.querySelector('.p1-tag-name');
@@ -233,6 +236,21 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const p2Tag = document.querySelector('.p2-tag-name');
     if (p2Tag) p2Tag.innerText = p2Name;
+    
+    // FITUR PENGUNCIAN ORIENTASI LAYAR
+    let orient = window.GameConfig.orientation;
+    if (orient && orient !== 'auto') {
+      try {
+        if (!document.fullscreenElement) await document.documentElement.requestFullscreen();
+        if (screen.orientation && screen.orientation.lock) {
+          await screen.orientation.lock(orient === 'portrait' ? 'portrait-primary' : 'landscape-primary');
+        }
+      } catch (err) { console.log("Device menolak Screen Lock otomatis.", err); }
+    } else {
+      if (screen.orientation && screen.orientation.unlock) {
+        try { screen.orientation.unlock(); } catch (e) {}
+      }
+    }
     
     switchScreen('game');
     if (typeof initGame === 'function') initGame(p1Name, p2Name);
