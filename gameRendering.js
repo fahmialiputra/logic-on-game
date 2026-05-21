@@ -117,7 +117,12 @@ function updateStatsUI(playerObj) {
         btn.dataset.player = playerObj;
         btn.dataset.index = index;
         
-        btn.onclick = () => { useItem(playerObj, index); };
+        // FIX BUG MULTI-TOUCH: Gunakan pointerup dan hentikan perambatan event ke kontrol lawan
+        btn.onpointerdown = (e) => { e.stopPropagation(); };
+        btn.onpointerup = (e) => { 
+            e.stopPropagation(); 
+            useItem(playerObj, index); 
+        };
         
         if (itemId === 'key') {
           btn.innerHTML = `🔑<br><small>Kunci</small>`;

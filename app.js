@@ -266,4 +266,12 @@ document.addEventListener('DOMContentLoaded', () => {
       if (state) state.isPaused = false;
     });
   });
+  
+  document.getElementById('btn-restart-p1')?.addEventListener('pointerdown', () => {
+    if (typeof window.resetPlayerEndless === 'function') window.resetPlayerEndless(1);
+  });
+  
+  document.getElementById('btn-restart-p2')?.addEventListener('pointerdown', () => {
+    if (typeof window.resetPlayerEndless === 'function') window.resetPlayerEndless(2);
+  });
 });

@@ -1,5 +1,34 @@
 // enemyAI.js - Advanced AI with Critical Error Fallbacks
 
+function getNextStepBFS(state, startX, startY, targetX, targetY) {
+    let sx = Math.round(startX), sy = Math.round(startY);
+    let tx = Math.round(targetX), ty = Math.round(targetY);
+    if (sx === tx && sy === ty) return null;
+    
+    let queue = [{x: sx, y: sy, firstStep: null}];
+    let visited = new Set();
+    visited.add(`${sx},${sy}`);
+    
+    let dirs = [[0,-1], [0,1], [-1,0], [1,0]];
+    
+    while(queue.length > 0) {
+        let curr = queue.shift();
+        if (curr.x === tx && curr.y === ty) return curr.firstStep;
+        
+        for(let d of dirs) {
+            let nx = curr.x + d[0], ny = curr.y + d[1];
+            if (nx >= 0 && nx < state.width && ny >= 0 && ny < state.height && state.maze[ny][nx] !== 1) {
+                let key = `${nx},${ny}`;
+                if (!visited.has(key)) {
+                    visited.add(key);
+                    queue.push({x: nx, y: ny, firstStep: curr.firstStep || {x: nx, y: ny}});
+                }
+            }
+        }
+    }
+    return null;
+}
+
 function processContinuousEnemyAI(playerObj, state, dt, isWallFunc) {
     let px = state.x; let py = state.y;
     let isUntargetable = (state.hp <= 0 || state.isDead || state.isPaused || state.isPromptingResurrect);
@@ -95,22 +124,59 @@ function processContinuousEnemyAI(playerObj, state, dt, isWallFunc) {
                 if (checkDeath(playerObj, state, m.name)) return;
             }
         } 
-        // 2. BOSS AI
+        // 2. BOSS AI (Optimized Pathfinding)
         else if (m.type === 'boss') {
-            let bossAggro = Math.hypot(state.width, state.height) * 0.3;
+            let bossAggro = Math.hypot(state.width, state.height) * 0.45; // Area deteksi ditingkatkan
             
             if (!isUntargetable && distToPlayer <= bossAggro) {
-                // FIX BUG NaN: Penjaga batas pembagian jika koordinat menyentuh bulat angka
-                if (distToPlayer > 0.05) {
-                    let dx = (px - m.x) / distToPlayer; let dy = (py - m.y) / distToPlayer;
-                    let nextX = m.x + dx * speed; let nextY = m.y + dy * speed;
-                    
-                    if (Math.hypot(nextX - exitX, nextY - exitY) > 4.5) {
+                let hasLOS = true;
+                let steps = Math.max(Math.ceil(distToPlayer * 3), 1);
+                
+                for (let i = 1; i <= steps; i++) {
+                    let cx = m.x + (px - m.x) * (i / steps);
+                    let cy = m.y + (py - m.y) * (i / steps);
+                    let rx = Math.round(cx); let ry = Math.round(cy);
+                    if (rx >= 0 && rx < state.width && ry >= 0 && ry < state.height && state.maze[ry][rx] === 1) { 
+                        hasLOS = false; break; 
+                    }
+                }
+
+                if (hasLOS) {
+                    if (distToPlayer > 0.05) {
+                        let dx = (px - m.x) / distToPlayer; let dy = (py - m.y) / distToPlayer;
+                        let nextX = m.x + dx * speed; let nextY = m.y + dy * speed;
+                        
                         if (!isWallFunc(state, nextX - r, m.y - r) && !isWallFunc(state, nextX + r, m.y - r) && !isWallFunc(state, nextX - r, m.y + r) && !isWallFunc(state, nextX + r, m.y + r)) m.x = nextX;
                         if (!isWallFunc(state, m.x - r, nextY - r) && !isWallFunc(state, m.x + r, nextY - r) && !isWallFunc(state, m.x - r, nextY + r) && !isWallFunc(state, m.x + r, nextY + r)) m.y = nextY;
                     }
+                    m.bfsTarget = null;
+                } else {
+                    if (m.pathTimer === undefined) m.pathTimer = 0;
+                    m.pathTimer -= dt;
+                    
+                    if (m.pathTimer <= 0 || !m.bfsTarget) {
+                        m.bfsTarget = getNextStepBFS(state, m.x, m.y, px, py);
+                        m.pathTimer = 0.3; // Hitung ulang rute setiap 0.3 detik agar responsif
+                    }
+                    
+                    if (m.bfsTarget) {
+                        let tx = m.bfsTarget.x; let ty = m.bfsTarget.y;
+                        let wDist = Math.hypot(tx - m.x, ty - m.y);
+                        
+                        if (wDist > 0.05) {
+                            let dx = (tx - m.x) / wDist; let dy = (ty - m.y) / wDist;
+                            let nextX = m.x + dx * speed; let nextY = m.y + dy * speed;
+                            
+                            if (!isWallFunc(state, nextX - r, m.y - r) && !isWallFunc(state, nextX + r, m.y - r) && !isWallFunc(state, nextX - r, m.y + r) && !isWallFunc(state, nextX + r, m.y + r)) m.x = nextX;
+                            if (!isWallFunc(state, m.x - r, nextY - r) && !isWallFunc(state, m.x + r, nextY - r) && !isWallFunc(state, m.x - r, nextY + r) && !isWallFunc(state, m.x + r, nextY + r)) m.y = nextY;
+                        } else {
+                            m.bfsTarget = null;
+                            m.pathTimer = 0; 
+                        }
+                    }
                 }
                 m.wanderTarget = null;
+                m.bossState = 'wander';
             } else {
                 if (m.bossState === 'idle') {
                     m.bossIdleTimer -= dt;
