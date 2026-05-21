@@ -84,13 +84,20 @@ function executeDeath(playerObj, state, killerName) {
     let overlay = document.getElementById(`dead-overlay-p${playerObj}`);
     
     if (overlay) {
-        let textElement = overlay.querySelector('p');
+        let textElement = document.getElementById(`dead-msg-p${playerObj}`);
+        let restartBtn = document.getElementById(`btn-restart-p${playerObj}`);
+        
         if (textElement) {
             if (window.GameConfig.players === 1) {
                 textElement.innerText = "Mengakhiri sesi...";
             } else {
-                let otherP = playerObj == 1 ? "Player 2" : "Player 1";
-                textElement.innerText = `Menunggu ${otherP}...`;
+                if (window.GameConfig.mode === 'endless') {
+                    textElement.innerText = "Kamu telah gugur.";
+                    if (restartBtn) restartBtn.classList.remove('hidden');
+                } else {
+                    let otherP = playerObj == 1 ? "Player 2" : "Player 1";
+                    textElement.innerText = `Menunggu ${otherP}...`;
+                }
             }
         }
         overlay.classList.remove('hidden');
@@ -103,7 +110,15 @@ function executeDeath(playerObj, state, killerName) {
     } else {
         let otherHp = playerObj == 1 ? window.p2State.hp : window.p1State.hp;
         let otherDead = playerObj == 1 ? window.p2State.isDead : window.p1State.isDead;
-        if(otherHp <= 0 || otherDead) window.deathTimeout = setTimeout(triggerGameOver, 2000); 
+        
+        if(otherHp <= 0 || otherDead) {
+            // Sembunyikan tombol restart jika keduanya mati untuk memicu Game Over
+            let btn1 = document.getElementById('btn-restart-p1'); if(btn1) btn1.classList.add('hidden');
+            let btn2 = document.getElementById('btn-restart-p2'); if(btn2) btn2.classList.add('hidden');
+            
+            if (window.deathTimeout) clearTimeout(window.deathTimeout);
+            window.deathTimeout = setTimeout(triggerGameOver, 2000); 
+        }
     }
 }
 
@@ -672,3 +687,43 @@ function initGame(p1Name, p2Name) {
     }
     setTimeout(resizeCanvas, 100); 
 }
+
+window.resetPlayerEndless = function(playerObj) {
+    let pName = playerObj == 1 ? window.p1State.name : window.p2State.name;
+    let pScore = playerObj == 1 ? window.p1State.score : window.p2State.score;
+    let pStage = playerObj == 1 ? window.p1State.stage : window.p2State.stage;
+    
+    // Simpan skor sebelum mereset
+    saveToLeaderboard(pName, pScore, pStage);
+    
+    let diff = window.GameConfig.diff || 3;
+    let baseSize = 11 + ((diff - 1) * 2);
+    let bossInterval = diff === 5 ? 5 : (diff >= 3 ? 6 : 7);
+    
+    const baseState = () => ({ 
+        x: 1, y: 1, visualX: 1, visualY: 1, facingX: 1, facingY: 0, 
+        hasKey: false, inventory: [], activeBuffs: [], lightBuff: 0, 
+        score: 0, shieldAngle: 0, teleportAnchor: null,
+        ...window.PLAYER_BASE_STATE,
+        stage: 1, width: baseSize, height: baseSize, bossDefeated: 0, maxInvBonus: 0, resurrectCount: 0,
+        isPaused: false, isDead: false, isPromptingResurrect: false, isInvincible: false,
+        effects: [], stats: { kills: 0, dmgDealt: 0, dmgTaken: 0 }
+    });
+    
+    let newState = { ...baseState(), id: playerObj, name: pName, theme: playerObj == 1 ? 'ruins' : 'jungle', maze: generateMaze(baseSize, baseSize, 1 % bossInterval === 0) };
+    
+    if (playerObj == 1) window.p1State = newState;
+    else window.p2State = newState;
+    
+    populateEntities(newState);
+    updateStatsUI(playerObj);
+    
+    let overlay = document.getElementById(`dead-overlay-p${playerObj}`);
+    if(overlay) overlay.classList.add('hidden');
+    let btn = document.getElementById(`btn-restart-p${playerObj}`);
+    if(btn) btn.classList.add('hidden');
+    
+    let screen = document.getElementById(`p${playerObj}-screen`);
+    let effectClasses = ['effect-invincible', 'effect-damage', 'effect-heal', 'effect-buff', 'effect-attack'];
+    if(screen) effectClasses.forEach(c => screen.classList.remove(c));
+};
