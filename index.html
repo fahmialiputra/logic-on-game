@@ -81,22 +81,43 @@
     </div>
     
     <div id="modal-setting" class="modal hidden">
-        <div class="modal-content glass-panel glow-blue" style="width: 90%; max-width: 450px;">
-            <h3 class="neon-blue" style="text-align: center; border-bottom: 2px dashed #444; padding-bottom: 15px; margin-bottom: 20px;">⚙️ SETTINGS</h3>
+        <div class="modal-content glass-panel glow-blue">
+            <h3 class="neon-blue" style="text-align: center; border-bottom: 2px dashed #444; padding-bottom: 15px; margin-bottom: 10px;">  SETTINGS</h3>
             
             <div class="setting-grid">
-                <div class="setting-group">
-                    <label>⏱️ Timer (Time Trial): <span id="timer-val" style="color:#f1c40f;">2</span> Min</label>
-                    <input type="range" id="setting-timer" class="custom-range" min="1" max="15" value="2">
+                <div class="setting-group" style="grid-column: 1 / -1;">
+                    <label style="color:#2ecc71;">URL Web App API (Leaderboard):</label>
+                    <input type="text" id="setting-api-url" class="custom-input" placeholder="https://script.google.com/macros/s/..." autocomplete="off">
                 </div>
 
                 <div class="setting-group">
-                    <label>🚀 Stage (Speedrun): <span id="stage-val" style="color:#f1c40f;">5</span> Stages</label>
+                    <label>  Timer (Time Trial): <span id="timer-val" style="color:#f1c40f;">2</span> Min</label>
+                    <input type="range" id="setting-timer" class="custom-range" min="1" max="15" value="2">
+                </div>
+                <div class="setting-group">
+                    <label>  Stage (Speedrun): <span id="stage-val" style="color:#f1c40f;">5</span> Stages</label>
                     <input type="range" id="setting-stage" class="custom-range" min="3" max="30" value="5">
                 </div>
 
+                <div class="setting-group">
+                    <label>  Difficulty:</label>
+                    <div id="star-rating" class="star-rating">
+                        <span data-val="1" class="star active"> </span>
+                        <span data-val="2" class="star active"> </span>
+                        <span data-val="3" class="star active"> </span>
+                        <span data-val="4" class="star"> </span>
+                        <span data-val="5" class="star"> </span>
+                    </div>
+                    <input type="hidden" id="setting-diff" value="3">
+                </div>
+
+                <div class="setting-group" id="boss-interval-group">
+                    <label>  Boss Muncul Tiap: <span id="boss-interval-val" style="color:#f1c40f;">10</span> Stage</label>
+                    <input type="range" id="setting-boss-interval" class="custom-range" min="3" max="20" value="10">
+                </div>
+
                 <div class="setting-group flex-between">
-                    <label>🔁 Batasi Restart (Endless)</label>
+                    <label>  Batasi Restart (Endless)</label>
                     <label class="toggle-switch">
                         <input type="checkbox" id="setting-limit-endless">
                         <span class="toggle-slider"></span>
@@ -104,54 +125,32 @@
                 </div>
                 
                 <div class="setting-group">
-                    <label>Max Restart (Jika Aktif): <span id="endless-limit-val" style="color:#f1c40f;">1</span>x</label>
+                    <label>Max Restart: <span id="endless-limit-val" style="color:#f1c40f;">1</span>x</label>
                     <input type="range" id="setting-endless-limit-val" class="custom-range" min="1" max="5" value="1">
                 </div>
                 
                 <div class="setting-group">
-                    <label>🔥 Difficulty:</label>
-                    <div id="star-rating" class="star-rating">
-                        <span data-val="1" class="star active">★</span>
-                        <span data-val="2" class="star active">★</span>
-                        <span data-val="3" class="star active">★</span>
-                        <span data-val="4" class="star">★</span>
-                        <span data-val="5" class="star">★</span>
-                    </div>
-                    <input type="hidden" id="setting-diff" value="3">
-                </div>
-
-                <div class="setting-group">
-                    <label style="margin-bottom: 8px; display: block;">👾 Tampilan HP Musuh:</label>
-                    <div class="radio-pills">
-                        <label><input type="radio" name="enemy-hp-view" value="angka" checked><span>Angka</span></label>
-                        <label><input type="radio" name="enemy-hp-view" value="bar"><span>Bar</span></label>
-                        <label><input type="radio" name="enemy-hp-view" value="sembunyi"><span>Sembunyi</span></label>
-                    </div>
-                </div>
-                
-                <div class="setting-group">
-                    <label style="margin-bottom: 8px; display: block;">📱 Kunci Orientasi (Layar Penuh):</label>
+                    <label style="margin-bottom: 8px; display: block;">  Kunci Layar:</label>
                     <div class="radio-pills">
                         <label><input type="radio" name="setting-orientation" value="auto" checked><span>Auto</span></label>
                         <label><input type="radio" name="setting-orientation" value="portrait"><span>Potrait</span></label>
                         <label><input type="radio" name="setting-orientation" value="landscape"><span>Landscape</span></label>
                     </div>
                 </div>
-                
-                <div class="setting-group flex-between">
-                    <label>🕹️ Mode Analog (Smooth)</label>
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="setting-smooth">
-                        <span class="toggle-slider"></span>
-                    </label>
+
+                <div class="setting-group" style="grid-column: 1 / -1;">
+                    <label style="color: #3498db; text-align: center; display: block; border-top: 1px dashed #555; padding-top: 10px;">  Mendukung Kontrol Gamepad & Keyboard</label>
+                    <p style="font-size: 0.55rem; color: #aaa; text-align: center; margin-top: 5px; line-height: 1.6;">
+                        <strong>[P1]</strong> WASD/D-Pad (Gerak), SPASI/A (Serang), E/B (Ambil), Q/Y (Tas)<br>
+                        <strong>[P2]</strong> Arah/Analog (Gerak), ENTER/A (Serang), SHIFT/B (Ambil), P/Y (Tas)
+                    </p>
                 </div>
             </div>
             
-            <div style="display:flex; gap:10px; margin-top:25px;">
+            <div style="display:flex; gap:10px; margin-top:5px;">
                 <button id="btn-save-setting" class="btn-menu arcade-btn" style="flex:1; background:#27ae60; padding:12px;">SIMPAN</button>
                 <button id="btn-close-setting" class="btn-menu arcade-btn" style="flex:1; background:#555; padding:12px;">TUTUP</button>
             </div>
-            <button id="btn-reset-game" class="btn-danger arcade-btn" style="width:100%; margin-top:10px;">Hapus Leaderboard</button>
         </div>
     </div>
     

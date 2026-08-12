@@ -1,6 +1,4 @@
-// quiz.js - Bank Soal 100 Item
 const quizBank = [
-  // --- TEMA 1: TABRAKAN / JALUR ---
   { q: "Apa yang terjadi jika karaktermu menabrak tembok di dalam game?", options: ["Tembus saja", "Berhenti", "Terbang", "Tembok hancur"], a: 1 },
   { q: "Komputer mengecek tabrakan dengan melihat...", options: ["Warna baju", "Posisi", "Nama", "Senjata"], a: 1 },
   { q: "JIKA (Posisi Pemain == Posisi Tembok) MAKA...", options: ["Jalan terus", "Mati", "Berhenti", "Menang"], a: 2 },
@@ -11,7 +9,6 @@ const quizBank = [
   { q: "Untuk membuat pintu yang terkunci, kita menjadikan pintu itu sebagai...", options: ["Jalan biasa", "Hiasan", "Tembok penghalang", "Air"], a: 2 },
   { q: "Saat mobil balap menabrak pagar, mobil itu melambat. Ini contoh...", options: ["Logika Kunci", "Logika HP", "Logika Tabrakan", "Logika Menang"], a: 2 },
   { q: "Apakah batas ujung map/layar juga memakai logika tabrakan?", options: ["Tidak", "Mungkin", "Hanya jika siang", "Ya, agar pemain tidak keluar batas"], a: 3 },
-  // (Pertanyaan di-skip sebentar demi kemudahan keterbacaan, sisa bank soal sama)
   { q: "Kalau kamu kelas 4 SD bermain web game ini, logika mana yang paling pertama kamu rasakan di awal labirin?", options: ["Syarat menang melawan boss", "Logika Tabrakan dengan dinding labirin", "Membuat game", "Membeli koin"], a: 1 }
 ];
 

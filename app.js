@@ -1,5 +1,3 @@
-// app.js - Manajemen UI, Navigasi Layar, dan Asset Game
-
 window.GameAssets = {
   images: {},
   placeholders: {
@@ -29,7 +27,7 @@ window.GameAssets = {
   }
 };
 
-window.GameConfig = { timer: 2, diff: 3, smooth: false, enemyHpView: 'angka', mode: 'time-trial', maxStage: 5, players: 2, orientation: 'auto', endlessLimitEnabled: false, endlessLimit: 1 };
+window.GameConfig = { timer: 2, diff: 3, smooth: false, enemyHpView: 'angka', mode: 'time-trial', maxStage: 5, players: 2, orientation: 'auto', endlessLimitEnabled: false, endlessLimit: 1, bossInterval: 10, apiUrl: "" };
 
 window.CustomDialog = {
   show: function(title, message, buttons) {
@@ -64,11 +62,48 @@ window.CustomDialog = {
   }
 };
 
-function loadLeaderboard() {
-  let lbData = JSON.parse(localStorage.getItem('logicGameLB') || '[]');
+function updateBossIntervalUI(diff) {
+    let bossInput = document.getElementById('setting-boss-interval');
+    let bossVal = document.getElementById('boss-interval-val');
+    if(!bossInput) return;
+
+    let min = 3, max = 20;
+    if (diff === 1) { min = 10; max = 20; }
+    else if (diff === 2) { min = 8; max = 15; }
+    else if (diff === 3) { min = 5; max = 12; }
+    else if (diff === 4) { min = 4; max = 8; }
+    else if (diff === 5) { min = 3; max = 5; }
+
+    bossInput.min = min;
+    bossInput.max = max;
+
+    let currentVal = parseInt(bossInput.value);
+    if (currentVal < min) bossInput.value = min;
+    if (currentVal > max) bossInput.value = max;
+    
+    bossVal.innerText = bossInput.value;
+    window.GameConfig.bossInterval = parseInt(bossInput.value);
+}
+
+async function loadLeaderboard() {
   let ul = document.getElementById('leaderboard-list');
+  ul.innerHTML = '<li><span style="color:#aaa; font-size: 0.6rem;">Sinkronisasi data API...</span></li>';
+  let lbData = [];
+
+  if (window.GameConfig.apiUrl && window.GameConfig.apiUrl.trim() !== "") {
+      try {
+          let res = await fetch(window.GameConfig.apiUrl);
+          let result = await res.json();
+          if (result.status === 'success') lbData = result.data;
+      } catch(e) {
+          console.error("Gagal sinkronisasi data dari Sheets API.", e);
+          lbData = JSON.parse(localStorage.getItem('logicGameLB') || '[]');
+      }
+  } else {
+      lbData = JSON.parse(localStorage.getItem('logicGameLB') || '[]');
+  }
+
   ul.innerHTML = '';
-  
   if (lbData.length === 0) {
     ul.innerHTML = '<li style="text-align:center; color:#aaa; font-size:0.7rem; padding:10px;">Belum ada data.</li>';
     return;
@@ -77,7 +112,8 @@ function loadLeaderboard() {
   lbData.sort((a, b) => b.score - a.score).slice(0, 5).forEach((entry, i) => {
     let li = document.createElement('li');
     li.className = 'lb-item';
-    li.innerHTML = `<span>#${i+1} ${entry.name}</span> <span>St.${entry.stage} | ${entry.score} pts</span>`;
+    let displayStage = entry.stageInfo || entry.stage;
+    li.innerHTML = `<span>#${i+1} ${entry.name}</span> <span>${displayStage} | ${entry.score} pts</span>`;
     ul.appendChild(li);
   });
 }
@@ -197,17 +233,27 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('setting-timer').addEventListener('input', (e) => { document.getElementById('timer-val').innerText = e.target.value; });
   document.getElementById('setting-stage').addEventListener('input', (e) => { document.getElementById('stage-val').innerText = e.target.value; });
   
+  document.getElementById('setting-boss-interval')?.addEventListener('input', (e) => {
+      document.getElementById('boss-interval-val').innerText = e.target.value;
+      window.GameConfig.bossInterval = parseInt(e.target.value);
+  });
+
+  document.getElementById('setting-api-url')?.addEventListener('input', (e) => {
+      window.GameConfig.apiUrl = e.target.value;
+  });
+
   const stars = document.querySelectorAll('.star-rating .star');
   const diffInput = document.getElementById('setting-diff');
   stars.forEach(star => {
-    star.addEventListener('pointerdown', (e) => {
-      let val = parseInt(e.target.dataset.val);
-      diffInput.value = val;
-      stars.forEach(s => {
-        if (parseInt(s.dataset.val) <= val) s.classList.add('active');
-        else s.classList.remove('active');
+      star.addEventListener('pointerdown', (e) => {
+          let val = parseInt(e.target.dataset.val);
+          diffInput.value = val;
+          stars.forEach(s => {
+              if (parseInt(s.dataset.val) <= val) s.classList.add('active');
+              else s.classList.remove('active');
+          });
+          updateBossIntervalUI(val);
       });
-    });
   });
 
   document.getElementById('setting-endless-limit-val').addEventListener('input', (e) => { document.getElementById('endless-limit-val').innerText = e.target.value; });

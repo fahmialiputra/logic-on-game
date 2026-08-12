@@ -6,12 +6,41 @@ window.deathTimeout = null;
 window.isGameActive = false;
 window.lastFrameTime = 0;
 
-function saveToLeaderboard(name, score, stage) {
+async function saveToLeaderboard(name, score, stage) {
     if (score === 0) return; 
     let lbData = JSON.parse(localStorage.getItem('logicGameLB') || '[]');
+    
     let modeLabel = window.GameConfig.mode.toUpperCase();
-    lbData.push({ name: `${name} [${modeLabel}]`, score: score, stage: stage });
+    let diff = window.GameConfig.diff || 3;
+    let timerEl = document.getElementById('game-timer');
+    
+    let stageInfo = stage;
+    if (window.GameConfig.mode === 'endless' || window.GameConfig.mode === 'time-trial') {
+        let timeTxt = timerEl ? timerEl.innerText : "00:00";
+        stageInfo = `St.${stage} [${timeTxt}]`;
+    }
+
+    lbData.push({ name: `${name} [${modeLabel}]`, score: score, stage: stageInfo, diff: diff });
     localStorage.setItem('logicGameLB', JSON.stringify(lbData));
+
+    if (window.GameConfig.apiUrl && window.GameConfig.apiUrl.trim() !== "") {
+        try {
+            await fetch(window.GameConfig.apiUrl, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: `${name} [${modeLabel}]`,
+                    mode: modeLabel,
+                    stageInfo: stageInfo,
+                    difficulty: diff,
+                    score: score
+                })
+            });
+        } catch (e) {
+            console.error("Gagal mengirim skor ke API Google Sheets:", e);
+        }
+    }
 }
 
 function triggerGameOver() {
@@ -349,7 +378,7 @@ function populateEntities(state) {
     let scaleHp = Math.pow(hpMult, stagePow);
     let scaleStat = Math.pow(statMult, stagePow);
 
-    let bossInterval = diff === 5 ? 5 : (diff >= 3 ? 6 : 7);
+    let bossInterval = window.GameConfig.bossInterval || 10;
     let isBossStage = state.stage % bossInterval === 0;
 
     if (isBossStage) {
@@ -454,7 +483,7 @@ function handleStageClear(playerObj, state) {
     }
     
     let diff = window.GameConfig.diff || 3;
-    let bossInterval = diff === 5 ? 5 : (diff >= 3 ? 6 : 7);
+    let bossInterval = window.GameConfig.bossInterval || 10;
     let isBossStage = state.stage % bossInterval === 0;
 
     if (isBossStage) {
@@ -539,7 +568,7 @@ function initGame(p1Name, p2Name) {
 
     if (window.deathTimeout) { clearTimeout(window.deathTimeout); window.deathTimeout = null; }
 
-    let bossInterval = diff === 5 ? 5 : (diff >= 3 ? 6 : 7);
+    let bossInterval = window.GameConfig.bossInterval || 10;
     
     const baseState = () => ({ 
         x: 1, y: 1, visualX: 1, visualY: 1, facingX: 1, facingY: 0, 
@@ -733,7 +762,7 @@ window.resetPlayerEndless = function(playerObj) {
     
     let diff = window.GameConfig.diff || 3;
     let baseSize = 11 + ((diff - 1) * 2);
-    let bossInterval = diff === 5 ? 5 : (diff >= 3 ? 6 : 7);
+    let bossInterval = window.GameConfig.bossInterval || 10;
     
     const baseState = () => ({ 
         x: 1, y: 1, visualX: 1, visualY: 1, facingX: 1, facingY: 0, 
