@@ -61,6 +61,6 @@ document.addEventListener('DOMContentLoaded', () => {
         showQuestion(index + 1);
       });
       optionsDiv.appendChild(btn);
-    });
-  }
+      });
+    }
 });

@@ -1,3 +1,9 @@
+/**
+ * Butuh perbaikan untuk penggunaan kontrol keyboard / gamepad fisik
+ * agar dapat kembali berfungsi untuk menggerakan karakter setelah keluar dari overlay inventory
+ */
+
+
 window.GameAssets = {
   images: {},
   placeholders: {
@@ -7,17 +13,28 @@ window.GameAssets = {
     item_10: 'assets/img/item10.png', item_11: 'assets/img/item11.png', item_19: 'assets/img/item19.png'
   },
   loadedCount: 0, totalCount: 0,
+  
   init: function(onComplete) {
     this.totalCount = Object.keys(this.placeholders).length;
     if (this.totalCount === 0) return onComplete();
     
     for (let key in this.placeholders) {
       let img = new Image();
+      
+      img.onload = () => { 
+          this.images[key] = img; 
+          this.checkComplete(onComplete); 
+      };
+      
+      img.onerror = () => { 
+          console.warn(`Aset gagal dimuat: ${key}. Menggunakan fallback emoji.`);
+          this.checkComplete(onComplete); 
+      };
+      
       img.src = this.placeholders[key];
-      img.onload = () => { this.images[key] = img; this.checkComplete(onComplete); };
-      img.onerror = () => { this.checkComplete(onComplete); };
     }
   },
+  
   checkComplete: function(onComplete) {
     this.loadedCount++;
     let pct = Math.floor((this.loadedCount / this.totalCount) * 100);
@@ -27,11 +44,18 @@ window.GameAssets = {
   }
 };
 
-window.GameConfig = { timer: 2, diff: 3, smooth: false, enemyHpView: 'angka', mode: 'time-trial', maxStage: 5, players: 2, orientation: 'auto', endlessLimitEnabled: false, endlessLimit: 1, bossInterval: 10, apiUrl: "https://script.google.com/macros/s/AKfycbyPk0c9xaWLfc6V2LYuRqUthm9fCtLO6Cm8ZXd16Uh1XgEUxsRJ0dm8OJhfDrxZF1E/exec" };
+window.GameConfig = { 
+    timer: 2, diff: 3, smooth: true, enemyHpView: 'bar', mode: 'time-trial', 
+    maxStage: 5, players: 2, orientation: 'auto', endlessLimitEnabled: true, endlessLimit: 1, 
+    bossInterval: 10, 
+    inputP1: 'keyboard', inputP2: 'touch', 
+    apiUrl: "https://script.google.com/macros/s/AKfycbyPk0c9xaWLfc6V2LYuRqUthm9fCtLO6Cm8ZXd16Uh1XgEUxsRJ0dm8OJhfDrxZF1E/exec" 
+};
 
 window.CustomDialog = {
   show: function(title, message, buttons) {
     const modal = document.getElementById('custom-modal');
+    if(!modal) return;
     document.getElementById('custom-modal-title').innerText = title;
     document.getElementById('custom-modal-message').innerText = message;
     
@@ -62,34 +86,62 @@ window.CustomDialog = {
   }
 };
 
+window.updateGamepadUI = function() {
+    let gps = navigator.getGamepads ? navigator.getGamepads() : [];
+    let p1Select = document.getElementById('gp-select-p1');
+    let p2Select = document.getElementById('gp-select-p2');
+    if(!p1Select || !p2Select) return;
+
+    let p1Val = window.GameConfig.gamepadP1 || 'auto';
+    let p2Val = window.GameConfig.gamepadP2 || 'auto';
+
+    p1Select.innerHTML = '<option value="auto">Auto / Keyboard</option>';
+    p2Select.innerHTML = '<option value="auto">Auto / Keyboard</option>';
+
+    for(let i = 0; i < gps.length; i++) {
+        if(gps[i]) {
+            let name = gps[i].id.replace(/[^a-zA-Z0-9 ]/g, "").substring(0, 15) + "...";
+            p1Select.innerHTML += `<option value="${i}">[Port ${i}] ${name}</option>`;
+            p2Select.innerHTML += `<option value="${i}">[Port ${i}] ${name}</option>`;
+        }
+    }
+    
+    p1Select.value = p1Val; if(!p1Select.value) p1Select.value = 'auto';
+    p2Select.value = p2Val; if(!p2Select.value) p2Select.value = 'auto';
+};
+
+window.addEventListener("gamepadconnected", window.updateGamepadUI);
+window.addEventListener("gamepaddisconnected", window.updateGamepadUI);
+
 function updateBossIntervalUI(diff) {
     let bossInput = document.getElementById('setting-boss-interval');
     let bossVal = document.getElementById('boss-interval-val');
     if(!bossInput) return;
-
+    
     let min = 3, max = 20;
-    if (diff === 1) { min = 10; max = 20; }
-    else if (diff === 2) { min = 8; max = 15; }
-    else if (diff === 3) { min = 5; max = 12; }
-    else if (diff === 4) { min = 4; max = 8; }
-    else if (diff === 5) { min = 3; max = 5; }
-
+    if (diff === 1) { max = 20; }
+    else if (diff === 2) { max = 15; }
+    else if (diff === 3) { max = 12; }
+    else if (diff === 4) { max = 8; }
+    else if (diff === 5) { max = 5; }
+    
     bossInput.min = min;
     bossInput.max = max;
-
+    
     let currentVal = parseInt(bossInput.value);
     if (currentVal < min) bossInput.value = min;
     if (currentVal > max) bossInput.value = max;
     
-    bossVal.innerText = bossInput.value;
+    if(bossVal) bossVal.innerText = bossInput.value;
     window.GameConfig.bossInterval = parseInt(bossInput.value);
 }
 
 async function loadLeaderboard() {
   let ul = document.getElementById('leaderboard-list');
+  if(!ul) return;
   ul.innerHTML = '<li><span style="color:#aaa; font-size: 0.6rem;">Sinkronisasi data API...</span></li>';
   let lbData = [];
-
+  
   if (window.GameConfig.apiUrl && window.GameConfig.apiUrl.trim() !== "") {
       try {
           let res = await fetch(window.GameConfig.apiUrl);
@@ -118,10 +170,52 @@ async function loadLeaderboard() {
   });
 }
 
+const inputIcons = { 'keyboard': '⌨️', 'touch': '📱', 'gamepad': '🎮' };
+const inputCycle = ['keyboard', 'touch', 'gamepad'];
+
+window.syncInputIcons = function() {
+    let btn1 = document.getElementById('toggle-input-p1');
+    let btn2 = document.getElementById('toggle-input-p2');
+    if(btn1) btn1.innerText = inputIcons[window.GameConfig.inputP1] || '⌨️';
+    if(btn2) btn2.innerText = inputIcons[window.GameConfig.inputP2] || '📱';
+    
+    let sel1 = document.getElementById('input-select-p1');
+    let sel2 = document.getElementById('input-select-p2');
+    if(sel1) sel1.value = window.GameConfig.inputP1;
+    if(sel2) sel2.value = window.GameConfig.inputP2;
+};
+
+window.cycleInputMode = function(p) {
+    let currentMode = p == 1 ? window.GameConfig.inputP1 : window.GameConfig.inputP2;
+    let nextIdx = (inputCycle.indexOf(currentMode) + 1) % inputCycle.length;
+    let nextMode = inputCycle[nextIdx];
+    
+    if (p == 1) window.GameConfig.inputP1 = nextMode;
+    else window.GameConfig.inputP2 = nextMode;
+    
+    window.syncInputIcons();
+    if (typeof showToast === 'function') showToast(p, "KONTROL", `Diubah ke ${nextMode.toUpperCase()}`);
+};
+
 document.addEventListener('DOMContentLoaded', () => {
   window.GameAssets.init(() => {
-    document.getElementById('screen-loading').classList.add('hidden');
-    document.getElementById('screen-title').classList.remove('hidden');
+    document.getElementById('screen-loading')?.classList.add('hidden');
+    document.getElementById('screen-title')?.classList.remove('hidden');
+  });
+
+  window.updateGamepadUI();
+  window.syncInputIcons();
+
+  document.getElementById('toggle-input-p1')?.addEventListener('pointerdown', () => window.cycleInputMode(1));
+  document.getElementById('toggle-input-p2')?.addEventListener('pointerdown', () => window.cycleInputMode(2));
+
+  document.getElementById('btn-exit')?.addEventListener('pointerdown', () => {
+      window.CustomDialog.confirm("Apakah Anda yakin ingin menutup game?", "KELUAR GAME", () => {
+          window.close();
+          setTimeout(() => {
+              window.CustomDialog.alert("Browser mencegah penutupan otomatis. Silakan tutup tab ini secara manual.", "INFO");
+          }, 500);
+      });
   });
 
   document.addEventListener('contextmenu', event => event.preventDefault());
@@ -133,9 +227,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (now - lastTouchEnd <= 300) event.preventDefault();
     lastTouchEnd = now;
   }, false);
-  
+
   document.addEventListener('touchmove', function(e) {
-    // FIX BUG: Memasukkan .mode-options, .radio-pills, .setting-grid agar input radio dan slider berjalan mulus alami tanpa diganggu sistem pointerdown.
     if (e.target.closest('.inv-grid') || e.target.closest('.inv-overlay') || e.target.closest('.accordion-body') ||
       e.target.closest('.modal-content') || e.target.closest('#leaderboard-panel') ||
       e.target.closest('.mode-options') || e.target.closest('.radio-pills') || e.target.closest('.setting-grid')) {
@@ -143,7 +236,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     e.preventDefault();
   }, { passive: false });
-  
+
   const screens = {
     title: document.getElementById('screen-title'),
     menu: document.getElementById('screen-menu'),
@@ -153,49 +246,53 @@ document.addEventListener('DOMContentLoaded', () => {
     game: document.getElementById('screen-game'),
     gameover: document.getElementById('screen-gameover')
   };
-  
+
   function switchScreen(targetId) {
-    Object.values(screens).forEach(screen => screen.classList.add('hidden'));
-    screens[targetId].classList.remove('hidden');
+    Object.values(screens).forEach(screen => {
+        if(screen) screen.classList.add('hidden');
+    });
+    if(screens[targetId]) screens[targetId].classList.remove('hidden');
   }
+
+  screens.title?.addEventListener('pointerdown', () => switchScreen('menu'));
+  document.getElementById('btn-review')?.addEventListener('pointerdown', () => switchScreen('review'));
+  document.getElementById('btn-play')?.addEventListener('pointerdown', () => switchScreen('modeSelect'));
   
-  screens.title.addEventListener('pointerdown', () => switchScreen('menu'));
-  document.getElementById('btn-review').addEventListener('pointerdown', () => switchScreen('review'));
-  document.getElementById('btn-play').addEventListener('pointerdown', () => switchScreen('modeSelect'));
-  
-  document.getElementById('btn-next-setup').addEventListener('pointerdown', () => {
+  document.getElementById('btn-next-setup')?.addEventListener('pointerdown', () => {
     const selMode = document.querySelector('input[name="game-mode"]:checked');
     window.GameConfig.mode = selMode ? selMode.value : 'time-trial';
     
     const selPlayers = document.querySelector('input[name="player-count"]:checked');
     window.GameConfig.players = selPlayers ? parseInt(selPlayers.value) : 2;
     
-    if (window.GameConfig.players === 1) document.getElementById('p2-input-group').classList.add('hidden');
-    else document.getElementById('p2-input-group').classList.remove('hidden');
-    
+    let p2Group = document.getElementById('p2-input-group');
+    if(p2Group) {
+        if (window.GameConfig.players === 1) p2Group.classList.add('hidden');
+        else p2Group.classList.remove('hidden');
+    }
     switchScreen('gameSetup');
   });
-  
-  document.getElementById('btn-leaderboard').addEventListener('pointerdown', () => {
+
+  document.getElementById('btn-leaderboard')?.addEventListener('pointerdown', () => {
     const panel = document.getElementById('leaderboard-panel');
+    if(!panel) return;
     panel.classList.toggle('hidden');
     if (!panel.classList.contains('hidden')) loadLeaderboard();
   });
-  
-  document.getElementById('btn-reset-game').addEventListener('pointerdown', () => {
+
+  document.getElementById('btn-reset-game')?.addEventListener('pointerdown', () => {
     window.CustomDialog.confirm("Hapus seluruh data Leaderboard secara permanen?", "HAPUS DATA", () => {
       localStorage.removeItem('logicGameLB');
       loadLeaderboard();
       window.CustomDialog.alert("Data Leaderboard berhasil dihapus.", "BERHASIL");
     });
   });
-  
-  document.getElementById('btn-home-gameover').addEventListener('pointerdown', () => {
+
+  document.getElementById('btn-home-gameover')?.addEventListener('pointerdown', () => {
     switchScreen('menu');
-    document.getElementById('leaderboard-panel').classList.add('hidden');
+    document.getElementById('leaderboard-panel')?.classList.add('hidden');
   });
-  
-  // FIX BUG OVERLAY KELUAR: Memastikan modal-upgrade yang sempat terbuka tertutup paksa
+
   document.querySelectorAll('.btn-back, .btn-back-slim').forEach(btn => {
       btn.addEventListener('pointerdown', (e) => {
         if (e.target.closest('#screen-game')) {
@@ -204,50 +301,49 @@ document.addEventListener('DOMContentLoaded', () => {
             if (window.gameInterval) { clearInterval(window.gameInterval); window.gameInterval = null; }
             if (window.deathTimeout) { clearTimeout(window.deathTimeout); window.deathTimeout = null; }
             
-            document.getElementById('dead-overlay-p1').classList.add('hidden');
-            document.getElementById('dead-overlay-p2').classList.add('hidden');
-            document.getElementById('inv-p1').classList.add('hidden');
-            document.getElementById('inv-p2').classList.add('hidden');
+            document.getElementById('dead-overlay-p1')?.classList.add('hidden');
+            document.getElementById('dead-overlay-p2')?.classList.add('hidden');
+            document.getElementById('inv-p1')?.classList.add('hidden');
+            document.getElementById('inv-p2')?.classList.add('hidden');
             
-            let modalUp1 = document.getElementById('upgrade-overlay-p1');
-            if (modalUp1) modalUp1.classList.add('hidden');
-            let modalUp2 = document.getElementById('upgrade-overlay-p2');
-            if (modalUp2) modalUp2.classList.add('hidden');
+            document.getElementById('upgrade-overlay-p1')?.classList.add('hidden');
+            document.getElementById('upgrade-overlay-p2')?.classList.add('hidden');
             
-            let modalUpgrade = document.getElementById('modal-upgrade');
-            if (modalUpgrade) modalUpgrade.classList.add('hidden');
-            
-            let resUp1 = document.getElementById('resurrect-overlay-p1'); if (resUp1) resUp1.classList.add('hidden');
-            let resUp2 = document.getElementById('resurrect-overlay-p2'); if (resUp2) resUp2.classList.add('hidden');
+            document.getElementById('resurrect-overlay-p1')?.classList.add('hidden');
+            document.getElementById('resurrect-overlay-p2')?.classList.add('hidden');
             
             switchScreen('menu');
           });
         } else switchScreen('menu');
       });
   });
-  
+
   const modalSetting = document.getElementById('modal-setting');
-  document.getElementById('btn-setting').addEventListener('pointerdown', () => modalSetting.classList.remove('hidden'));
-  document.getElementById('btn-close-setting').addEventListener('pointerdown', () => modalSetting.classList.add('hidden'));
+  document.getElementById('btn-setting')?.addEventListener('pointerdown', () => modalSetting?.classList.remove('hidden'));
+  document.getElementById('btn-close-setting')?.addEventListener('pointerdown', () => modalSetting?.classList.add('hidden'));
   
-  document.getElementById('setting-timer').addEventListener('input', (e) => { document.getElementById('timer-val').innerText = e.target.value; });
-  document.getElementById('setting-stage').addEventListener('input', (e) => { document.getElementById('stage-val').innerText = e.target.value; });
+  document.getElementById('setting-timer')?.addEventListener('input', (e) => { 
+      let el = document.getElementById('timer-val');
+      if(el) el.innerText = e.target.value; 
+  });
+  
+  document.getElementById('setting-stage')?.addEventListener('input', (e) => { 
+      let el = document.getElementById('stage-val');
+      if(el) el.innerText = e.target.value; 
+  });
   
   document.getElementById('setting-boss-interval')?.addEventListener('input', (e) => {
-      document.getElementById('boss-interval-val').innerText = e.target.value;
+      let el = document.getElementById('boss-interval-val');
+      if(el) el.innerText = e.target.value;
       window.GameConfig.bossInterval = parseInt(e.target.value);
   });
-
-  document.getElementById('setting-api-url')?.addEventListener('input', (e) => {
-      window.GameConfig.apiUrl = e.target.value;
-  });
-
+  
   const stars = document.querySelectorAll('.star-rating .star');
   const diffInput = document.getElementById('setting-diff');
   stars.forEach(star => {
       star.addEventListener('pointerdown', (e) => {
           let val = parseInt(e.target.dataset.val);
-          diffInput.value = val;
+          if(diffInput) diffInput.value = val;
           stars.forEach(s => {
               if (parseInt(s.dataset.val) <= val) s.classList.add('active');
               else s.classList.remove('active');
@@ -256,13 +352,23 @@ document.addEventListener('DOMContentLoaded', () => {
       });
   });
 
-  document.getElementById('setting-endless-limit-val').addEventListener('input', (e) => { document.getElementById('endless-limit-val').innerText = e.target.value; });
-  
-  document.getElementById('btn-save-setting').addEventListener('pointerdown', () => {
-    window.GameConfig.timer = parseInt(document.getElementById('setting-timer').value);
-    window.GameConfig.maxStage = parseInt(document.getElementById('setting-stage').value);
-    window.GameConfig.diff = parseInt(document.getElementById('setting-diff').value);
-    window.GameConfig.smooth = document.getElementById('setting-smooth').checked;
+  document.getElementById('setting-endless-limit-val')?.addEventListener('input', (e) => { 
+      let el = document.getElementById('endless-limit-val');
+      if(el) el.innerText = e.target.value; 
+  });
+
+  document.getElementById('btn-save-setting')?.addEventListener('pointerdown', () => {
+    let tVal = document.getElementById('setting-timer');
+    if(tVal) window.GameConfig.timer = parseInt(tVal.value);
+    
+    let sVal = document.getElementById('setting-stage');
+    if(sVal) window.GameConfig.maxStage = parseInt(sVal.value);
+    
+    let dVal = document.getElementById('setting-diff');
+    if(dVal) window.GameConfig.diff = parseInt(dVal.value);
+    
+    let smVal = document.getElementById('setting-smooth');
+    if(smVal) window.GameConfig.smooth = smVal.checked;
     
     const selectedRadio = document.querySelector('input[name="enemy-hp-view"]:checked');
     window.GameConfig.enemyHpView = selectedRadio ? selectedRadio.value : 'angka';
@@ -270,28 +376,48 @@ document.addEventListener('DOMContentLoaded', () => {
     const orientRadio = document.querySelector('input[name="setting-orientation"]:checked');
     window.GameConfig.orientation = orientRadio ? orientRadio.value : 'auto';
     
-    window.GameConfig.endlessLimitEnabled = document.getElementById('setting-limit-endless').checked;
-    window.GameConfig.endlessLimit = parseInt(document.getElementById('setting-endless-limit-val').value);
+    let limitEndless = document.getElementById('setting-limit-endless');
+    if(limitEndless) window.GameConfig.endlessLimitEnabled = limitEndless.checked;
     
-    modalSetting.classList.add('hidden');
+    let limitVal = document.getElementById('setting-endless-limit-val');
+    if(limitVal) window.GameConfig.endlessLimit = parseInt(limitVal.value);
+
+    let inP1 = document.getElementById('input-select-p1');
+    if(inP1) window.GameConfig.inputP1 = inP1.value;
+    let inP2 = document.getElementById('input-select-p2');
+    if(inP2) window.GameConfig.inputP2 = inP2.value;
+    
+    window.syncInputIcons();
+    
+    const modalSetting = document.getElementById('modal-setting');
+    modalSetting?.classList.add('hidden');
     window.CustomDialog.alert("Konfigurasi berhasil diterapkan!", "BERHASIL");
   });
-  
-  document.getElementById('btn-fullscreen').addEventListener('pointerdown', () => {
-    if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(err => console.log(err));
-    else document.exitFullscreen();
+
+  document.getElementById('btn-fullscreen')?.addEventListener('pointerdown', () => {
+    let btn = document.getElementById('btn-fullscreen');
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => console.log(err));
+        btn.innerHTML = '🗗';
+    } else {
+        document.exitFullscreen();
+        btn.innerHTML = '🔲';
+    }
   });
-  
-  document.getElementById('btn-start-game').addEventListener('pointerdown', async () => {
-    const p1Name = document.getElementById('p1-name').value.trim() || 'PLAYER 1';
-    const p2Name = document.getElementById('p2-name').value.trim() || 'PLAYER 2';
+
+  document.getElementById('btn-start-game')?.addEventListener('pointerdown', async () => {
+    let p1In = document.getElementById('p1-name');
+    let p2In = document.getElementById('p2-name');
+    
+    const p1Name = (p1In ? p1In.value.trim() : '') || 'PLAYER 1';
+    const p2Name = (p2In ? p2In.value.trim() : '') || 'PLAYER 2';
+    
     const p1Tag = document.querySelector('.p1-tag-name');
     if (p1Tag) p1Tag.innerText = p1Name;
     
     const p2Tag = document.querySelector('.p2-tag-name');
     if (p2Tag) p2Tag.innerText = p2Name;
     
-    // FITUR PENGUNCIAN ORIENTASI LAYAR
     let orient = window.GameConfig.orientation;
     if (orient && orient !== 'auto') {
       try {
@@ -320,7 +446,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (state) state.isPaused = false;
     });
   });
-  
+
   document.getElementById('btn-restart-p1')?.addEventListener('pointerdown', () => {
     if (typeof window.resetPlayerEndless === 'function') window.resetPlayerEndless(1);
   });
@@ -328,7 +454,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-restart-p2')?.addEventListener('pointerdown', () => {
     if (typeof window.resetPlayerEndless === 'function') window.resetPlayerEndless(2);
   });
-  // EVENT LISTENER RESURRECTION SPESIFIK
+
   [1, 2].forEach(p => {
     document.getElementById(`btn-resurrect-yes-p${p}`)?.addEventListener('pointerdown', () => {
       if (typeof window[`resurrectActionYes${p}`] === 'function') window[`resurrectActionYes${p}`]();

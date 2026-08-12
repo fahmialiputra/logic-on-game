@@ -1,147 +1,143 @@
+const HP_COLORS = [
+    'linear-gradient(90deg, #e74c3c, #c0392b)', 'linear-gradient(90deg, #e67e22, #d35400)',
+    'linear-gradient(90deg, #f1c40f, #f39c12)', 'linear-gradient(90deg, #2ecc71, #27ae60)',
+    'linear-gradient(90deg, #3498db, #2980b9)', 'linear-gradient(90deg, #9b59b6, #8e44ad)',
+    'linear-gradient(90deg, #ff9ff3, #feca57)'
+];
+
 function getMaxHpCap(state) {
-  let diff = window.GameConfig.diff || 3;
-  let baseMax = (state && state.maxHp) ? state.maxHp : 100;
-  
-  if (diff > 4) return baseMax + 200;
-  if (diff > 2) return baseMax + 500;
-  return baseMax + 900;
+    let diff = window.GameConfig.diff || 3;
+    let baseMax = (state && state.maxHp) ? state.maxHp : 100;
+    if (diff > 4) return baseMax + 200;
+    if (diff > 2) return baseMax + 500;
+    return baseMax + 900;
 }
 
 function showToast(playerObj, title, message) {
-  let toast = document.getElementById(`toast-p${playerObj}`);
-  if (!toast) return;
-  document.getElementById(`toast-p${playerObj}-title`).innerText = title + ":";
-  document.getElementById(`toast-p${playerObj}-msg`).innerText = message;
-  
-  toast.classList.remove('hidden');
-  if (toast.timeoutId) clearTimeout(toast.timeoutId);
-  toast.timeoutId = setTimeout(() => { toast.classList.add('hidden'); }, 2000);
+    let toast = document.getElementById(`toast-p${playerObj}`);
+    if (!toast) return;
+    document.getElementById(`toast-p${playerObj}-title`).innerText = title + ":";
+    document.getElementById(`toast-p${playerObj}-msg`).innerText = message;
+    toast.classList.remove('hidden');
+    if (toast.timeoutId) clearTimeout(toast.timeoutId);
+    toast.timeoutId = setTimeout(() => { toast.classList.add('hidden'); }, 2000);
 }
 
 function triggerEffect(playerObj, type) {
-  let screen = document.getElementById(`p${playerObj}-screen`);
-  if (!screen) return;
-  screen.classList.remove('effect-damage', 'effect-heal', 'effect-buff', 'effect-attack');
-  void screen.offsetWidth;
-  screen.classList.add(`effect-${type}`);
-  setTimeout(() => { screen.classList.remove(`effect-${type}`); }, 400);
+    let screen = document.getElementById(`p${playerObj}-screen`);
+    if (!screen) return;
+    screen.classList.remove('effect-damage', 'effect-heal', 'effect-buff', 'effect-attack');
+    void screen.offsetWidth;
+    screen.classList.add(`effect-${type}`);
+    setTimeout(() => { screen.classList.remove(`effect-${type}`); }, 400);
 }
 
 function addVisualEffect(state, x, y, emoji, type = 'normal') {
-  state.effects.push({ x: x, y: y, emoji: emoji, life: 1.0, type: type });
+    state.effects.push({ x: x, y: y, emoji: emoji, life: 1.0, type: type });
 }
 
 function updateStatsUI(playerObj) {
-  let state = playerObj == 1 ? window.p1State : window.p2State;
-  
-  // PEMBARUAN BOSS HP BAR UI
-  let bossHpWrap = document.getElementById(`boss-hp-wrap-p${playerObj}`);
-  let bossHpFill = document.getElementById(`boss-hp-fill-p${playerObj}`);
-  let bossHpText = document.getElementById(`boss-hp-text-p${playerObj}`);
-  
-  if (bossHpWrap && state.monsters) {
-      let boss = state.monsters.find(m => m.type === 'boss');
-      if (boss) {
-          bossHpWrap.classList.remove('hidden');
-          let pct = Math.max(0, (boss.hp / boss.maxHp) * 100);
-          bossHpFill.style.width = pct + '%';
-          bossHpText.innerText = `${boss.name}: ${Math.round(boss.hp)}/${boss.maxHp}`;
-      } else {
-          bossHpWrap.classList.add('hidden');
-      }
-  }
-  
-  let baseFill = document.getElementById(`p${playerObj}-hp-fill-base`);
-  let overFill = document.getElementById(`p${playerObj}-hp-fill-over`);
-  if (baseFill && overFill) {
-      let hpColors = [
-          'linear-gradient(90deg, #e74c3c, #c0392b)', 'linear-gradient(90deg, #e67e22, #d35400)',
-          'linear-gradient(90deg, #f1c40f, #f39c12)', 'linear-gradient(90deg, #2ecc71, #27ae60)',
-          'linear-gradient(90deg, #3498db, #2980b9)', 'linear-gradient(90deg, #9b59b6, #8e44ad)',
-          'linear-gradient(90deg, #ff9ff3, #feca57)'
-      ];
-      let maxLayer = hpColors.length - 1;
-      let currentLayer = Math.max(0, Math.ceil(state.hp / 100) - 1);
-      let prevLayer = Math.max(0, currentLayer - 1);
-      let fgColor = hpColors[Math.min(currentLayer, maxLayer)];
-      let bgColor = currentLayer > 0 ? hpColors[Math.min(prevLayer, maxLayer)] : '#8b0000';
-      let pct = state.hp % 100;
-      if (state.hp > 0 && pct === 0) pct = 100; 
-      if (state.hp <= 0) pct = 0;
-
-      baseFill.style.width = '100%'; baseFill.style.background = bgColor;
-      overFill.style.width = pct + '%'; overFill.style.background = fgColor; overFill.style.opacity = '1';
-  }
-  
-  document.getElementById(`p${playerObj}-hp`).innerText = Math.round(state.hp);
-  document.getElementById(`p${playerObj}-shield`).innerText = state.shield;
-  document.getElementById(`p${playerObj}-atk`).innerText = state.atk;
-  document.getElementById(`p${playerObj}-def`).innerText = state.def;
-  
-  // Mencegah error jika elemen p1-stage/p2-stage dihapus dari kontrol panel
-  let stageEl = document.getElementById(`p${playerObj}-stage`);
-  if (stageEl) stageEl.innerText = state.stage;
-  
-  let scoreEl = document.getElementById(`p${playerObj}-score`);
-  if (scoreEl) scoreEl.innerText = state.score;
-  
-  let hd = document.getElementById(`header-p${playerObj}-stage`);
-  if (hd) hd.innerText = `[St.${state.stage}]`;
-  
-  let buffHTML = state.activeBuffs.map((b, i) => {
-    let pct = (b.timeLeft / b.maxTime) * 100;
-    let emoji = b.emoji || '✨';
-    return `<div class="buff-indicator" id="buff-p${playerObj}-${b.id}-${i}" style="--pct: ${pct}%" title="${b.name}"><span>${emoji}</span></div>`;
-  }).join('');
-  document.getElementById(`p${playerObj}-buffs`).innerHTML = buffHTML || '-';
-  
-  let invContainer = document.getElementById(`inv-list-p${playerObj}`);
-  invContainer.innerHTML = '';
-  
-  let diff = window.GameConfig.diff || 3;
-  let maxInv = (28 - (diff * 4)) + (state.maxInvBonus || 0);
-  let currentItemsCount = state.inventory.filter(i => i !== 'key').length;
-
-  let tagElements = document.querySelectorAll(`#inv-p${playerObj} h4`);
-  if (tagElements.length > 0) {
-    let pLabel = playerObj == 1 ? window.p1State.name : window.p2State.name;
-    tagElements[0].innerHTML = `🎒 TAS <span class="p-name-tag p${playerObj}-tag-name">${pLabel}</span> (${currentItemsCount}/${maxInv})`;
-  }
-  
-  if (state.inventory.length === 0) {
-    invContainer.innerHTML = '<p style="color:#aaa; width:100%; text-align:center; grid-column: span 4; font-size:0.55rem; padding: 20px 0;">Tas Kosong</p>';
-  } else {
-    state.inventory.forEach((itemId, index) => {
-        let btn = document.createElement('button');
-        btn.className = 'inv-item-btn action-use-item';
-        btn.dataset.player = playerObj;
-        btn.dataset.index = index;
-        
-        // FIX BUG MULTI-TOUCH: Gunakan pointerup dan hentikan perambatan event ke kontrol lawan
-        btn.onpointerdown = (e) => { e.stopPropagation(); };
-        btn.onpointerup = (e) => { 
-            e.stopPropagation(); 
-            useItem(playerObj, index); 
-        };
-        
-        if (itemId === 'key') {
-          btn.innerHTML = `🔑<br><small>Kunci</small>`;
+    let state = playerObj == 1 ? window.p1State : window.p2State;
+    
+    let bossHpWrap = document.getElementById(`boss-hp-wrap-p${playerObj}`);
+    let bossHpFill = document.getElementById(`boss-hp-fill-p${playerObj}`);
+    let bossHpText = document.getElementById(`boss-hp-text-p${playerObj}`);
+    if (bossHpWrap && state.monsters) {
+        let boss = state.monsters.find(m => m.type === 'boss');
+        if (boss) {
+            bossHpWrap.classList.remove('hidden');
+            let pct = Math.max(0, (boss.hp / boss.maxHp) * 100);
+            bossHpFill.style.width = pct + '%';
+            bossHpText.innerText = `${boss.name}: ${Math.round(boss.hp)}/${boss.maxHp}`;
         } else {
-          let d = window.ITEM_DB[itemId];
-          btn.innerHTML = `${d.emoji}<br><small>${d.name}</small>`;
-          if (state.isPaused && state.hp === 1 && (d.type === 'heal' || d.type === 'shield')) btn.classList.add('highlight-heal');
+            bossHpWrap.classList.add('hidden');
         }
-        invContainer.appendChild(btn);
-      });
-  }
+    }
+
+    let baseFill = document.getElementById(`p${playerObj}-hp-fill-base`);
+    let overFill = document.getElementById(`p${playerObj}-hp-fill-over`);
+    if (baseFill && overFill) {
+        let maxLayer = HP_COLORS.length - 1;
+        let currentLayer = Math.max(0, Math.ceil(state.hp / 100) - 1);
+        let prevLayer = Math.max(0, currentLayer - 1);
+        let fgColor = HP_COLORS[Math.min(currentLayer, maxLayer)];
+        let bgColor = currentLayer > 0 ? HP_COLORS[Math.min(prevLayer, maxLayer)] : '#8b0000';
+        let pct = state.hp % 100;
+        if (state.hp > 0 && pct === 0) pct = 100; 
+        if (state.hp <= 0) pct = 0;
+        
+        baseFill.style.width = '100%'; baseFill.style.background = bgColor;
+        overFill.style.width = pct + '%'; overFill.style.background = fgColor; overFill.style.opacity = '1';
+    }
+
+    document.getElementById(`p${playerObj}-hp`).innerText = Math.round(state.hp);
+    document.getElementById(`p${playerObj}-shield`).innerText = state.shield;
+    document.getElementById(`p${playerObj}-atk`).innerText = state.atk;
+    document.getElementById(`p${playerObj}-def`).innerText = state.def;
+    
+    let stageEl = document.getElementById(`p${playerObj}-stage`);
+    if (stageEl) stageEl.innerText = state.stage;
+    let scoreEl = document.getElementById(`p${playerObj}-score`);
+    if (scoreEl) scoreEl.innerText = state.score;
+    let hd = document.getElementById(`header-p${playerObj}-stage`);
+    if (hd) hd.innerText = `[St.${state.stage}]`;
+    
+    let buffHTML = state.activeBuffs.map((b, i) => {
+        let pct = (b.timeLeft / b.maxTime) * 100;
+        let emoji = b.emoji || '✨';
+        return `<div class="buff-indicator" id="buff-p${playerObj}-${b.id}-${i}" style="--pct: ${pct}%" title="${b.name}"><span>${emoji}</span></div>`;
+    }).join('');
+    document.getElementById(`p${playerObj}-buffs`).innerHTML = buffHTML || '-';
+    
+    let diff = window.GameConfig.diff || 3;
+    let maxInv = (28 - (diff * 4)) + (state.maxInvBonus || 0);
+    let currentItemsCount = state.inventory.filter(i => i !== 'key').length;
+    
+    let tagElements = document.querySelectorAll(`#inv-p${playerObj} h4`);
+    if (tagElements.length > 0) {
+        let pLabel = playerObj == 1 ? window.p1State.name : window.p2State.name;
+        tagElements[0].innerHTML = `🎒 TAS <span class="p-name-tag p${playerObj}-tag-name">${pLabel}</span> (${currentItemsCount}/${maxInv})`;
+    }
+
+    let invContainer = document.getElementById(`inv-list-p${playerObj}`);
+    invContainer.innerHTML = '';
+    if (state.inventory.length === 0) {
+        invContainer.innerHTML = '<p style="color:#aaa; width:100%; text-align:center; grid-column: span 4; font-size:0.55rem; padding: 20px 0;">Tas Kosong</p>';
+    } else {
+        state.inventory.forEach((itemId, index) => {
+            let btn = document.createElement('button');
+            btn.className = 'inv-item-btn action-use-item';
+            btn.dataset.player = playerObj;
+            btn.dataset.index = index;
+            
+            if (state.isInvOpen && index === state.invSelection) {
+                btn.classList.add('selected-item');
+            }
+            
+            btn.onpointerdown = (e) => { e.stopPropagation(); };
+            btn.onpointerup = (e) => { 
+                e.stopPropagation(); 
+                state.invSelection = index; 
+                useItem(playerObj, index); 
+            };
+            
+            if (itemId === 'key') {
+                btn.innerHTML = `🔑<br><small>Kunci</small>`;
+            } else {
+                let d = window.ITEM_DB[itemId];
+                btn.innerHTML = `${d.emoji}<br><small>${d.name}</small>`;
+                if (state.isPaused && state.hp === 1 && (d.type === 'heal' || d.type === 'shield')) btn.classList.add('highlight-heal');
+            }
+            invContainer.appendChild(btn);
+        });
+    }
 }
 
 function drawGame() {
-  let ctx1 = document.getElementById('canvas-p1').getContext('2d');
-  let ctx2 = document.getElementById('canvas-p2').getContext('2d');
-  
-  renderMaze(ctx1, window.p1State.maze, window.p1State.width, window.p1State.height, window.p1State.theme, window.p1State);
-  if (window.GameConfig.players > 1) {
-    renderMaze(ctx2, window.p2State.maze, window.p2State.width, window.p2State.height, window.p2State.theme, window.p2State);
-  }
+    let ctx1 = document.getElementById('canvas-p1').getContext('2d');
+    let ctx2 = document.getElementById('canvas-p2').getContext('2d');
+    renderMaze(ctx1, window.p1State.maze, window.p1State.width, window.p1State.height, window.p1State.theme, window.p1State);
+    if (window.GameConfig.players > 1) {
+        renderMaze(ctx2, window.p2State.maze, window.p2State.width, window.p2State.height, window.p2State.theme, window.p2State);
+    }
 }

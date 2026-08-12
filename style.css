@@ -30,9 +30,39 @@ html, body {
 .neon-yellow { text-shadow: 0 0 10px #f1c40f, 0 0 20px #e67e22; color: #fff; }
 .neon-red { text-shadow: 0 0 10px #e74c3c, 0 0 20px #c0392b; color: #fff; }
 
-.btn-global { position: absolute; top: 15px; right: 15px; background: #444; border: 2px solid #fff; color: #fff; padding: 10px; cursor: pointer; z-index: 100; }
+.btn-global { 
+    position: absolute; top: 15px; right: 65px; /* Digeser agar tidak menabrak Fullscreen */
+    background: #444; border: 2px solid #fff; color: #fff; padding: 10px; 
+    cursor: pointer; z-index: 100; border-radius: 8px;
+}
 .btn-back { position: absolute; top: 15px; left: 15px; background: #8b0000; border: 2px solid #fff; color: #fff; padding: 10px; cursor: pointer; z-index: 100; }
 .btn-back-slim { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); background: #8b0000; border: 2px solid #fff; color: #fff; padding: 4px 12px; font-size: 0.65rem; cursor: pointer; border-radius: 4px; }
+
+#btn-fullscreen {
+    position: fixed;
+    top: 15px;
+    right: 15px;
+    background: rgba(10, 10, 20, 0.85);
+    border: 2px solid #3498db;
+    color: #3498db;
+    width: 42px;
+    height: 42px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    cursor: pointer;
+    z-index: 10000;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.5), inset 0 0 5px rgba(52, 152, 219, 0.5);
+    backdrop-filter: blur(5px);
+    transition: all 0.2s ease;
+}
+#btn-fullscreen:active {
+    transform: scale(0.9);
+    background: #3498db;
+    color: #fff;
+}
 
 .arcade-btn { 
     transition: transform 0.1s ease, box-shadow 0.1s ease; 
@@ -140,6 +170,23 @@ html, body {
     z-index: 40; box-shadow: 0 2px 0 #8b0000; transition: 0.1s;
 }
 .btn-back-slim:active { transform: translateY(calc(-50% + 2px)); box-shadow: 0 0 0 transparent; }
+
+.btn-input-toggle {
+    background: #222;
+    border: 1px solid #f1c40f;
+    color: #fff;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    padding: 3px 8px;
+    cursor: pointer;
+    margin-top: 5px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    transition: 0.2s;
+}
+.btn-input-toggle:active {
+    transform: scale(0.85);
+    background: #f1c40f;
+}
 
 .score-timer { 
     display: flex; width: 100%; max-width: 500px; justify-content: center; 
@@ -355,6 +402,7 @@ canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; backgro
     .setting-grid { grid-template-columns: 1fr 1fr; }
     .setting-group { margin-bottom: 5px; }
 }
+
 @media (max-width: 768px) and (orientation: portrait) {
     .split-screen { flex-direction: column; }
     .player-screen { border-left: none; border-top: 4px solid #fff; }
@@ -383,4 +431,18 @@ canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; backgro
     position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
     color: #fff; font-size: 0.55rem; font-weight: bold; letter-spacing: 1px;
     text-shadow: 1px 1px 2px #000; width: 100%; text-align: center;
+}
+
+select.custom-input option {
+    background-color: #222; 
+    color: #fff;
+    font-size: 0.6rem;
+}
+
+.inv-item-btn.selected-item {
+    border: 2px solid #fff !important;
+    background: #444 !important;
+    transform: scale(1.1);
+    box-shadow: 0 0 12px rgba(255, 255, 255, 0.8) !important;
+    z-index: 5;
 }

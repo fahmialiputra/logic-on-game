@@ -1,15 +1,8 @@
-// gameLogic.js - Update Fungsi executeDeath, checkDeath, attackEnemy, populateEntities, & initGame
-
-window.p1State = {}; window.p2State = {};
-window.gameInterval = null; 
-window.deathTimeout = null; 
-window.isGameActive = false;
-window.lastFrameTime = 0;
+window.p1State = {}; window.p2State = {}; window.gameInterval = null;  window.deathTimeout = null;  window.isGameActive = false; window.lastFrameTime = 0;
 
 async function saveToLeaderboard(name, score, stage) {
     if (score === 0) return; 
     let lbData = JSON.parse(localStorage.getItem('logicGameLB') || '[]');
-    
     let modeLabel = window.GameConfig.mode.toUpperCase();
     let diff = window.GameConfig.diff || 3;
     let timerEl = document.getElementById('game-timer');
@@ -19,10 +12,10 @@ async function saveToLeaderboard(name, score, stage) {
         let timeTxt = timerEl ? timerEl.innerText : "00:00";
         stageInfo = `St.${stage} [${timeTxt}]`;
     }
-
+    
     lbData.push({ name: `${name} [${modeLabel}]`, score: score, stage: stageInfo, diff: diff });
     localStorage.setItem('logicGameLB', JSON.stringify(lbData));
-
+    
     if (window.GameConfig.apiUrl && window.GameConfig.apiUrl.trim() !== "") {
         try {
             await fetch(window.GameConfig.apiUrl, {
@@ -47,7 +40,6 @@ function triggerGameOver() {
     window.isGameActive = false;
     let resUp1 = document.getElementById('resurrect-overlay-p1'); if (resUp1) resUp1.classList.add('hidden');
     let resUp2 = document.getElementById('resurrect-overlay-p2'); if (resUp2) resUp2.classList.add('hidden');
-
     if (window.gameInterval) { clearInterval(window.gameInterval); window.gameInterval = null; }
     if (window.deathTimeout) { clearTimeout(window.deathTimeout); window.deathTimeout = null; }
     
@@ -60,7 +52,6 @@ function triggerGameOver() {
     
     let modeText = "MODE: " + mode.toUpperCase().replace('-', ' ');
     document.getElementById('gameover-winner').innerHTML = `<span style="font-size:0.65rem; display:block; color:#aaa; margin-bottom:5px;">${modeText}</span>`;
-
     if (isSingle) {
         if (mode === 'speedrun' && window.p1State.stage >= window.GameConfig.maxStage) {
             document.getElementById('gameover-winner').innerHTML += `<span class="neon-green">SPEEDRUN COMPLETED!</span>`;
@@ -84,7 +75,7 @@ function triggerGameOver() {
     document.getElementById('go-p1-dmgDealt').innerText = window.p1State.stats ? window.p1State.stats.dmgDealt : 0;
     document.getElementById('go-p1-dmgTaken').innerText = window.p1State.stats ? window.p1State.stats.dmgTaken : 0;
     saveToLeaderboard(n1, s1, window.p1State.stage);
-
+    
     let goCardP2 = document.getElementById('go-card-p2');
     if (!isSingle) {
         goCardP2.style.display = 'block';
@@ -98,15 +89,13 @@ function triggerGameOver() {
     } else {
         goCardP2.style.display = 'none';
     }
-
+    
     document.getElementById('screen-game').classList.add('hidden');
     document.getElementById('custom-modal').classList.add('hidden');
-    
     let modalUp1 = document.getElementById('upgrade-overlay-p1');
     if (modalUp1) modalUp1.classList.add('hidden');
     let modalUp2 = document.getElementById('upgrade-overlay-p2');
     if (modalUp2) modalUp2.classList.add('hidden');
-    
     document.getElementById('screen-gameover').classList.remove('hidden');
 }
 
@@ -118,11 +107,9 @@ function executeDeath(playerObj, state, killerName) {
     let isLimitEnabled = window.GameConfig.endlessLimitEnabled;
     let limit = window.GameConfig.endlessLimit || 1;
     let canRestart = isEndless && (!isLimitEnabled || (state.endlessRestarts || 0) < limit);
-
     if (overlay) {
         let textElement = document.getElementById(`dead-msg-p${playerObj}`);
         let restartBtn = document.getElementById(`btn-restart-p${playerObj}`);
-        
         if (textElement) {
             if (window.GameConfig.players === 1) {
                 textElement.innerText = "Mengakhiri sesi...";
@@ -145,7 +132,6 @@ function executeDeath(playerObj, state, killerName) {
         }
         overlay.classList.remove('hidden');
     }
-
     showToast(playerObj, "GUGUR", `Tewas oleh ${killerName}`);
     
     if (window.GameConfig.players === 1) {
@@ -155,14 +141,12 @@ function executeDeath(playerObj, state, killerName) {
         let otherHp = otherState.hp;
         let otherDead = otherState.isDead;
         let otherCanRestart = isEndless && (!isLimitEnabled || (otherState.endlessRestarts || 0) < limit);
-
         if (otherHp <= 0 || otherDead) {
             if (isEndless && (canRestart || otherCanRestart)) {
-                // Jangan panggil Game Over jika setidaknya satu player masih berhak restart
+                // Biarkan game berjalan untuk pemain yang merestart
             } else {
                 let btn1 = document.getElementById('btn-restart-p1'); if(btn1) btn1.classList.add('hidden');
                 let btn2 = document.getElementById('btn-restart-p2'); if(btn2) btn2.classList.add('hidden');
-                
                 if (window.deathTimeout) clearTimeout(window.deathTimeout);
                 window.deathTimeout = setTimeout(triggerGameOver, 2000); 
             }
@@ -172,7 +156,6 @@ function executeDeath(playerObj, state, killerName) {
 
 function checkDeath(playerObj, state, killerName) {
     if (state.hp <= 0 && !state.isDead) {
-        
         let ankhIndex = state.inventory.indexOf(39);
         if (ankhIndex > -1) {
             state.inventory.splice(ankhIndex, 1);
@@ -182,9 +165,8 @@ function checkDeath(playerObj, state, killerName) {
             updateStatsUI(playerObj);
             return false;
         }
-
+        
         if (state.isPromptingResurrect) return false;
-
         let diff = window.GameConfig.diff || 3;
         let hasSaveItem = state.inventory.some(id => id !== 'key' && window.ITEM_DB[id] && (window.ITEM_DB[id].type === 'heal' || window.ITEM_DB[id].type === 'shield'));
         
@@ -205,37 +187,30 @@ function checkDeath(playerObj, state, killerName) {
             let cost = Math.floor(state.score * 0.25);
             let sisa = maxResurrect - currentResurrects;
             
-            // REDESIGN: Memanggil UI Bangkit secara spesifik untuk layar pemain yang bersangkutan
             let resOverlay = document.getElementById(`resurrect-overlay-p${playerObj}`);
             if (resOverlay) {
                 document.getElementById(`resurrect-msg-p${playerObj}`).innerText = `(Sisa: ${sisa}x)\nBiaya: -${cost} Skor`;
-                
                 window[`resurrectActionYes${playerObj}`] = () => {
                     resOverlay.classList.add('hidden');
                     state.isPromptingResurrect = false;
                     state.resurrectCount = currentResurrects + 1;
                     state.score -= cost;
                     state.hp = 100; state.isPaused = false; state.isDead = false; state.isInvincible = true;
-                    
                     let screen = document.getElementById(`p${playerObj}-screen`);
                     if(screen) screen.classList.add('effect-invincible');
                     showToast(playerObj, "BANGKIT!", "Kebal 10 detik!");
-                    
                     state.activeBuffs.push({ id: 999, emoji: '👼', name: 'Resurrection', maxTime: 10, timeLeft: 10, isInvincibility: true });
                     updateStatsUI(playerObj);
                 };
-                
                 window[`resurrectActionNo${playerObj}`] = () => {
                     resOverlay.classList.add('hidden');
                     state.isPromptingResurrect = false;
                     executeDeath(playerObj, state, killerName);
                 };
-                
                 resOverlay.classList.remove('hidden');
             }
             return false; 
         }
-
         executeDeath(playerObj, state, killerName);
         return true;
     }
@@ -259,9 +234,8 @@ function checkLineOfSight(state, x1, y1, x2, y2) {
 function attackEnemy(playerObj) {
     let state = playerObj == 1 ? window.p1State : window.p2State;
     if (!window.isGameActive || state.hp <= 0 || state.isDead || state.isPaused || state.isPromptingResurrect) return;
-
     let px = state.x; let py = state.y;
-    let atkRange = 1.5; let weaponEmoji = '💥'; 
+    let atkRange = 1.5; let weaponEmoji = '👊';
     let atkBuffs = state.activeBuffs.filter(b => window.ITEM_DB[b.id] && window.ITEM_DB[b.id].type === 'atk');
     
     if (atkBuffs.length > 0) {
@@ -272,36 +246,34 @@ function attackEnemy(playerObj) {
         else if (bestWeapon.id == 12) atkRange = 2.8; 
         else atkRange = 1.8; 
     }
-
+    
     let pierceBuff = state.activeBuffs.find(b => b.pierce);
     if (pierceBuff) atkRange += pierceBuff.rangeBonus;
-
+    
     let fLen = Math.hypot(state.facingX, state.facingY) || 1;
     let dx = state.facingX / fLen; let dy = state.facingY / fLen;
     let fxX = px + dx * 0.6; let fxY = py + dy * 0.6;
     
     triggerEffect(playerObj, 'attack'); 
     state.effects.push({ x: fxX, y: fxY, emoji: weaponEmoji, life: 1.0, type: 'player_attack_swing', dx: dx, dy: dy });
-
+    
     let targetIdx = -1; let minDist = Infinity;
     state.monsters.forEach((m, idx) => {
         let dist = Math.hypot(px - m.x, py - m.y);
         let hasLOS = checkLineOfSight(state, px, py, m.x, m.y);
-        if (pierceBuff && Math.random() < pierceBuff.pierceChance) hasLOS = true; 
-        
+        if (pierceBuff && Math.random() < pierceBuff.pierceChance) hasLOS = true;
         if (dist <= atkRange && dist < minDist && hasLOS) { targetIdx = idx; minDist = dist; }
     });
-
+    
     if (targetIdx > -1) {
         let monster = state.monsters[targetIdx];
         let pAtk = state.atk;
         if (monster.type === 'dark' && state.lightBuff > 0) pAtk += 20;
-
         let dmgToMonster = Math.max(1, pAtk - monster.def);
         monster.hp -= dmgToMonster;
         state.stats.dmgDealt += dmgToMonster;
-        state.effects.push({ x: monster.x, y: monster.y, emoji: '💢', life: 1.0, type: 'normal' });
-
+        state.effects.push({ x: monster.x, y: monster.y, emoji: '💥', life: 1.0, type: 'normal' });
+        
         if (monster.hp <= 0) {
             state.monsters.splice(targetIdx, 1);
             state.score += 150; state.stats.kills += 1;
@@ -309,15 +281,12 @@ function attackEnemy(playerObj) {
             if (monster.type === 'boss') {
                 let diff = window.GameConfig.diff || 3;
                 state.inventory.push('key'); state.hasKey = true;
-                
                 state.bossDefeated = (state.bossDefeated || 0) + 1;
-                state.maxInvBonus = (state.maxInvBonus || 0) + 2; 
+                state.maxInvBonus = (state.maxInvBonus || 0) + 2;
                 
-                // SKALA PENINGKATAN STATUS PEMAIN
                 let hpPct = diff === 5 ? 0.075 : (diff >= 3 ? 0.06 : 0.05);
                 let shieldPct = diff === 5 ? 0.05 : (diff >= 3 ? 0.04 : 0.04);
                 let statPct = diff === 5 ? 0.05 : (diff >= 3 ? 0.04 : 0.03);
-                
                 let maxHpBonus = Math.ceil(state.maxHp * hpPct);
                 let maxShieldBonus = Math.ceil(state.maxShield * shieldPct);
                 let atkBonus = Math.ceil(state.baseAtk * statPct);
@@ -325,27 +294,24 @@ function attackEnemy(playerObj) {
                 
                 state.baseAtk += atkBonus; state.baseDef += defBonus;
                 state.atk += atkBonus; state.def += defBonus;
-                
                 state.maxHp += maxHpBonus;
                 state.maxShield += maxShieldBonus;
-                state.hp = state.maxHp; 
+                state.hp = state.maxHp;
                 
-                // Modal Peningkatan Khusus untuk Pemain Tertentu
                 state.isPaused = true; 
                 let upgradeOverlay = document.getElementById(`upgrade-overlay-p${playerObj}`);
                 let upgradeList = document.getElementById(`upgrade-list-p${playerObj}`);
                 if (upgradeOverlay && upgradeList) {
                     upgradeList.innerHTML = `
                         <p style="color:#3498db; font-weight:bold; margin-bottom:5px;">Pahlawan: ${state.name}</p>
-                        <p>❤️ Batas Max HP: <span style="color:#2ecc71;">+${maxHpBonus}</span> (Total: ${state.maxHp})</p>
-                        <p>💠 Batas Max Shield: <span style="color:#2ecc71;">+${maxShieldBonus}</span> (Total: ${state.maxShield})</p>
-                        <p>⚔️ Kekuatan ATK: <span style="color:#2ecc71;">+${atkBonus}</span></p>
-                        <p>🛡️ Pertahanan DEF: <span style="color:#2ecc71;">+${defBonus}</span></p>
+                        <p>🔼 Batas Max HP: <span style="color:#2ecc71;">+${maxHpBonus}</span> (Total: ${state.maxHp})</p>
+                        <p>🔼 Batas Max Shield: <span style="color:#2ecc71;">+${maxShieldBonus}</span> (Total: ${state.maxShield})</p>
+                        <p>🔼 Kekuatan ATK: <span style="color:#2ecc71;">+${atkBonus}</span></p>
+                        <p>🔼 Pertahanan DEF: <span style="color:#2ecc71;">+${defBonus}</span></p>
                         <p>🎒 Kapasitas Tas: <span style="color:#f1c40f;">+2 Slot Baru</span></p>
                     `;
                     upgradeOverlay.classList.remove('hidden');
                 }
-
                 if (diff > 4 && Math.random() < 0.5) {
                     state.inventory.push(39); showToast(playerObj, "EPIC LOOT!", `Mendapat Ankh Pembangkit!`);
                 }
@@ -369,18 +335,15 @@ function populateEntities(state) {
     emptyCells.sort(() => Math.random() - 0.5);
     
     let diff = window.GameConfig.diff || 3;
-    
-    // SKALA PENINGKATAN STATUS MUSUH TIAP NAIK STAGE
     let hpMult = diff === 5 ? 1.075 : (diff >= 3 ? 1.06 : 1.05);
     let statMult = diff === 5 ? 1.05 : (diff >= 3 ? 1.04 : 1.03);
     
     let stagePow = Math.max(0, state.stage - 1);
     let scaleHp = Math.pow(hpMult, stagePow);
     let scaleStat = Math.pow(statMult, stagePow);
-
     let bossInterval = window.GameConfig.bossInterval || 10;
     let isBossStage = state.stage % bossInterval === 0;
-
+    
     if (isBossStage) {
         let bossCell = emptyCells.shift();
         let db = window.ENEMY_DB['boss'];
@@ -388,29 +351,23 @@ function populateEntities(state) {
         let bossAtk = Math.floor((db.baseAtk + (diff * db.diffAtkBonus)) * scaleStat);
         let bossDef = Math.floor((db.baseDef + (diff * db.diffDefBonus)) * scaleStat);
         
-        state.monsters.push({ 
-             x: bossCell.x, y: bossCell.y, originX: bossCell.x, originY: bossCell.y, 
+        state.monsters.push({
+             x: bossCell.x, y: bossCell.y, originX: bossCell.x, originY: bossCell.y,
              visualX: bossCell.x, visualY: bossCell.y, atkCooldown: 0, healUses: 0,
-             type: 'boss', emoji: db.emoji, hp: bossHp, maxHp: bossHp, atk: bossAtk, def: bossDef, name: db.name 
+             type: 'boss', emoji: db.emoji, hp: bossHp, maxHp: bossHp, atk: bossAtk, def: bossDef, name: db.name
         });
     } else {
-        let monsterCount = Math.floor(Math.max(state.width, state.height) / 4) + diff; 
-        
+        let monsterCount = Math.floor(Math.max(state.width, state.height) / 4) + diff;
         if (diff >= 3) monsterCount = Math.min(monsterCount, Math.floor(state.width * state.height * 0.05));
         let placedMonsters = [];
-
+        
         for(let i = emptyCells.length - 1; i >= 0 && placedMonsters.length < monsterCount; i--) {
             let cell = emptyCells[i];
-            
-            // Jarak Aman dari pemain (Spawn Awal)
             if (Math.abs(cell.x - 1) + Math.abs(cell.y - 1) < (4 + diff)) continue;
-            
             let tooClose = placedMonsters.some(m => Math.hypot(m.x - cell.x, m.y - cell.y) < 2.5);
             if (tooClose) continue;
             
             placedMonsters.push(cell);
-            
-            // PENAMBAHAN JENIS MUSUH BARU
             let normalEnemies = ['dark', 'beast', 'slime', 'skeleton', 'spider_melee', 'spider_ranged', 'skeleton_shield'];
             let typeKey = normalEnemies[Math.floor(Math.random() * normalEnemies.length)];
             let db = window.ENEMY_DB[typeKey];
@@ -422,28 +379,26 @@ function populateEntities(state) {
             let finalHp = Math.floor(baseHp * scaleHp);
             let finalAtk = Math.floor(baseAtk * scaleStat);
             let finalDef = Math.floor(baseDef * scaleStat);
-
-            state.monsters.push({ 
-                 x: cell.x, y: cell.y, visualX: cell.x, visualY: cell.y, originX: cell.x, originY: cell.y, 
-                 atkCooldown: 0, type: typeKey, emoji: db.emoji, hp: finalHp, maxHp: finalHp, atk: finalAtk, def: finalDef, name: db.name 
+            
+            state.monsters.push({
+                 x: cell.x, y: cell.y, visualX: cell.x, visualY: cell.y, originX: cell.x, originY: cell.y,
+                 atkCooldown: 0, type: typeKey, emoji: db.emoji, hp: finalHp, maxHp: finalHp, atk: finalAtk, def: finalDef, name: db.name
             });
             emptyCells.splice(i, 1);
         }
     }
     
-    // PEMBAGIAN ITEM PENCEGAH UNSOLVABLE
     let bd = state.bossDefeated || 0;
     let mapSizeMultiplier = Math.max(1, Math.floor(state.height / 10));
     let weaponCount = Math.max(1, 4 - Math.floor(diff / 2)) * mapSizeMultiplier;
     let utilCount = Math.max(1, 4 - Math.floor(diff / 2)) * mapSizeMultiplier;
-    let healCount = Math.max(2, 7 - diff) * mapSizeMultiplier; 
-    let shieldCount = Math.max(1, 3 - Math.floor(diff / 2)) * mapSizeMultiplier; 
+    let healCount = Math.max(2, 7 - diff) * mapSizeMultiplier;
+    let shieldCount = Math.max(1, 3 - Math.floor(diff / 2)) * mapSizeMultiplier;
     
     emptyCells.sort((a, b) => Math.hypot(a.x - 1, a.y - 1) - Math.hypot(b.x - 1, b.y - 1));
-
     function getAccessibleCell() {
         if (emptyCells.length === 0) return null;
-        let maxIndex = Math.max(1, Math.floor(emptyCells.length * 0.35)); // Mengambil dari area 35% terdekat
+        let maxIndex = Math.max(1, Math.floor(emptyCells.length * 0.35)); 
         return emptyCells.splice(Math.floor(Math.random() * maxIndex), 1)[0];
     }
     
@@ -451,27 +406,27 @@ function populateEntities(state) {
         if (emptyCells.length === 0) return null;
         return emptyCells.splice(Math.floor(Math.random() * emptyCells.length), 1)[0];
     }
-
+    
     for(let i=0; i<healCount; i++) {
         let base = diff >= 4 ? 19 : 20;
         let id = Math.min(23, base + Math.floor(Math.random() * (2 + bd)));
-        if (diff > 4 && Math.random() > 0.8) id = 37; 
-        if (diff > 4 && Math.random() > 0.8) id = 38; 
-        let cell = getAccessibleCell(); if (cell) state.maze[cell.y][cell.x] = id; 
+        if (diff > 4 && Math.random() > 0.8) id = 37;
+        if (diff > 4 && Math.random() > 0.8) id = 38;
+        let cell = getAccessibleCell(); if (cell) state.maze[cell.y][cell.x] = id;
     }
-    for(let i=0; i<shieldCount; i++) { 
+    for(let i=0; i<shieldCount; i++) {
         let id = Math.min(25, 24 + Math.floor(Math.random() * (1 + bd)));
-        if (diff > 4 && Math.random() > 0.7) id = 30 + Math.floor(Math.random() * 3); 
-        let cell = getAccessibleCell(); if (cell) state.maze[cell.y][cell.x] = id; 
+        if (diff > 4 && Math.random() > 0.7) id = 30 + Math.floor(Math.random() * 3);
+        let cell = getAccessibleCell(); if (cell) state.maze[cell.y][cell.x] = id;
     }
-    for(let i=0; i<weaponCount; i++) { 
+    for(let i=0; i<weaponCount; i++) {
         let id = Math.min(12, 10 + Math.floor(Math.random() * (2 + bd)));
-        let cell = getRandomCell(); if (cell) state.maze[cell.y][cell.x] = id; 
+        let cell = getRandomCell(); if (cell) state.maze[cell.y][cell.x] = id;
     }
-    for(let i=0; i<utilCount; i++) { 
+    for(let i=0; i<utilCount; i++) {
         let id = Math.random() > 0.5 ? 13 + Math.floor(Math.random() * 3) : 16 + Math.floor(Math.random() * 3);
-        if (diff > 4 && Math.random() > 0.6) id = 33 + Math.floor(Math.random() * 4); 
-        let cell = getRandomCell(); if (cell) state.maze[cell.y][cell.x] = id; 
+        if (diff > 4 && Math.random() > 0.6) id = 33 + Math.floor(Math.random() * 4);
+        let cell = getRandomCell(); if (cell) state.maze[cell.y][cell.x] = id;
     }
 }
 
@@ -485,30 +440,19 @@ function handleStageClear(playerObj, state) {
     let diff = window.GameConfig.diff || 3;
     let bossInterval = window.GameConfig.bossInterval || 10;
     let isBossStage = state.stage % bossInterval === 0;
-
+    
     if (isBossStage) {
-        let orient = window.GameConfig.orientation || 'auto';
-        let isPortrait = orient === 'portrait' ? true : (orient === 'landscape' ? false : window.innerHeight > window.innerWidth);
-        
-        if (window.GameConfig.players === 1) {
-            if (isPortrait) { state.height += 4; state.width += 2; }
-            else { state.width += 4; state.height += 2; }
-        } else {
-            state.height += 2; state.width += 2;
-        }
-        showToast(playerObj, "NEXT REALM", "Membuka Labirin yang Lebih Luas!");
+        showToast(playerObj, "NEXT REALM", "Membuka Level Lanjutan!");
     } else {
         showToast(playerObj, "STAGE CLEAR!", `Naik level!`);
     }
-
-    state.score += 300; state.stage += 1; 
-
+    
+    state.score += 300; state.stage += 1;
     let nextIsBossStage = state.stage % bossInterval === 0;
+    
     state.maze = generateMaze(state.width, state.height, nextIsBossStage);
-    
     state.x = 1; state.y = 1; state.visualX = 1; state.visualY = 1;
-    state.teleportAnchor = null; 
-    
+    state.teleportAnchor = null;
     let keyIdx = state.inventory.indexOf('key');
     if (keyIdx > -1) state.inventory.splice(keyIdx, 1);
     state.hasKey = false;
@@ -520,17 +464,14 @@ function handleStageClear(playerObj, state) {
 function initGame(p1Name, p2Name) {
     let resUp1 = document.getElementById('resurrect-overlay-p1'); if (resUp1) resUp1.classList.add('hidden');
     let resUp2 = document.getElementById('resurrect-overlay-p2'); if (resUp2) resUp2.classList.add('hidden');
-
     let diff = window.GameConfig.diff || 3;
-    let baseSize = 11 + ((diff - 1) * 2);
+    let baseSize = 11 + (diff - 1);
     let height = baseSize;
     let width = baseSize;
     
-    // PEMBENTUKAN RASIO LABIRIN ADAPTIF UNTUK SOLO MODE
     if (window.GameConfig.players === 1) {
         let orient = window.GameConfig.orientation || 'auto';
         let isPortrait = orient === 'portrait' ? true : (orient === 'landscape' ? false : window.innerHeight > window.innerWidth);
-        
         if (isPortrait) {
             height = Math.floor(baseSize * 1.6);
             if (height % 2 === 0) height++;
@@ -539,13 +480,12 @@ function initGame(p1Name, p2Name) {
             if (width % 2 === 0) width++;
         }
     }
-
+    
     let screen1 = document.getElementById('p1-screen'); let screen2 = document.getElementById('p2-screen');
     let effectClasses = ['effect-invincible', 'effect-damage', 'effect-heal', 'effect-buff', 'effect-attack'];
-    
     if(screen1) effectClasses.forEach(c => screen1.classList.remove(c));
     if(screen2) effectClasses.forEach(c => screen2.classList.remove(c));
-
+    
     document.getElementById('dead-overlay-p1').classList.add('hidden');
     document.getElementById('dead-overlay-p2').classList.add('hidden');
     document.getElementById('inv-p1').classList.add('hidden');
@@ -556,7 +496,7 @@ function initGame(p1Name, p2Name) {
     if(bossHpWrapP1) bossHpWrapP1.classList.add('hidden');
     let bossHpWrapP2 = document.getElementById('boss-hp-wrap-p2');
     if(bossHpWrapP2) bossHpWrapP2.classList.add('hidden');
-
+    
     if (typeof stopMoving === 'function') { stopMoving(1); stopMoving(2); }
     if (window.joysticks) {
         [1, 2].forEach(p => {
@@ -565,15 +505,15 @@ function initGame(p1Name, p2Name) {
             if (knob) knob.style.transform = 'translate(0px, 0px)';
         });
     }
-
+    
     if (window.deathTimeout) { clearTimeout(window.deathTimeout); window.deathTimeout = null; }
-
     let bossInterval = window.GameConfig.bossInterval || 10;
     
-    const baseState = () => ({ 
-        x: 1, y: 1, visualX: 1, visualY: 1, facingX: 1, facingY: 0, 
-        hasKey: false, inventory: [], activeBuffs: [], lightBuff: 0, 
-        score: 0, shieldAngle: 0, teleportAnchor: null,
+    const baseState = () => ({
+         x: 1, y: 1, visualX: 1, visualY: 1, facingX: 1, facingY: 0,
+         hasKey: false, inventory: [], activeBuffs: [], lightBuff: 0,
+         score: 0, shieldAngle: 0, teleportAnchor: null,
+         isInvOpen: false, invSelection: 0,
         ...window.PLAYER_BASE_STATE,
         stage: 1, width: width, height: height, bossDefeated: 0, maxInvBonus: 0, resurrectCount: 0,
         isPaused: false, isDead: false, isPromptingResurrect: false, isInvincible: false,
@@ -592,7 +532,7 @@ function initGame(p1Name, p2Name) {
         document.getElementById('p2-screen').style.display = 'flex';
         document.getElementById('score-p2-wrap').style.display = 'inline-block';
     }
-
+    
     populateEntities(window.p1State); populateEntities(window.p2State);
     updateStatsUI(1); if(window.GameConfig.players > 1) updateStatsUI(2);
     
@@ -614,7 +554,6 @@ function initGame(p1Name, p2Name) {
     const timerUI = document.getElementById('game-timer');
     window.gameInterval = setInterval(() => {
         if (!window.isGameActive) return;
-        
         if (isTimeTrial) {
             timeVal--;
             let m = Math.floor(timeVal / 60).toString().padStart(2, '0');
@@ -628,31 +567,25 @@ function initGame(p1Name, p2Name) {
             timerUI.innerText = `${m}:${s}`;
         }
     }, 1000);
-
+    
     window.lastFrameTime = performance.now();
-
-    // Hentikan sisa loop render dari sesi sebelumnya (jika ada)
     if (window.renderFrameId) {
         cancelAnimationFrame(window.renderFrameId);
     }
-
-    // Deklarasikan fungsi loop menggunakan standar global object
+    
     window.loop = function() {
         let now = performance.now();
         let dt = (now - window.lastFrameTime) / 1000;
         window.lastFrameTime = now;
-
         if (window.isGameActive) {
             [1, 2].forEach(p => {
                 if (p === 2 && window.GameConfig.players === 1) return;
                 let state = p === 1 ? window.p1State : window.p2State;
                 if (!state) return;
-
                 let regenBuff = state.activeBuffs.find(b => b.regenRate);
                 if (regenBuff && state.hp > 0 && !state.isDead) {
                     state.hp = Math.min(typeof getMaxHpCap === "function" ? getMaxHpCap(state) : 100, state.hp + regenBuff.regenRate * dt);
                 }
-
                 for(let i = state.activeBuffs.length - 1; i >= 0; i--) {
                     let b = state.activeBuffs[i];
                     b.timeLeft -= dt;
@@ -674,38 +607,32 @@ function initGame(p1Name, p2Name) {
                         if(el) { el.style.setProperty('--pct', `${(b.timeLeft / b.maxTime) * 100}%`); }
                     }
                 }
-
                 for (let i = state.effects.length - 1; i >= 0; i--) {
                     state.effects[i].life -= 0.06; 
                     if (state.effects[i].life <= 0) state.effects.splice(i, 1);
                 }
-
                 function isWall(st, cx, cy) {
                     let rx = Math.round(cx); let ry = Math.round(cy);
                     if(rx < 0 || rx >= st.width || ry < 0 || ry >= st.height) return true;
                     return st.maze[ry][rx] === 1;
                 }
-
                 if (state.hp > 0 && !state.isDead) {
                     if (window.GameConfig.smooth && !state.isPaused && !state.isPromptingResurrect) {
                         let jx = window.joysticks[p].dx; let jy = window.joysticks[p].dy;
                         if (jx !== 0 || jy !== 0) {
                             state.facingX = jx; state.facingY = jy;
-                            
                             let speedMod = 1.0;
                             let speedBuff = state.activeBuffs.find(b => b.speedMod);
                             if (speedBuff) speedMod = speedBuff.speedMod;
                             
                             let speed = 0.08 * speedMod;
                             let nextX = state.x + jx * speed; let nextY = state.y + jy * speed;
-                            
                             let r = 0.35; 
                             let canX = !isWall(state, nextX-r, state.y-r) && !isWall(state, nextX+r, state.y-r) && !isWall(state, nextX-r, state.y+r) && !isWall(state, nextX+r, state.y+r);
                             let canY = !isWall(state, state.x-r, nextY-r) && !isWall(state, state.x+r, nextY-r) && !isWall(state, state.x-r, nextY+r) && !isWall(state, state.x+r, nextY+r);
                             
                             if (canX) state.x = nextX;
                             if (canY) state.y = nextY;
-
                             let gridX = Math.round(state.x); let gridY = Math.round(state.y);
                             if (state.maze[gridY] && state.maze[gridY][gridX] === 3) {
                                 if (state.hasKey) handleStageClear(p, state);
@@ -717,19 +644,15 @@ function initGame(p1Name, p2Name) {
                         state.visualY += (state.y - state.visualY) * 0.25;
                     }
                 }
-
                 processContinuousEnemyAI(p, state, dt, isWall);
-
             });
             drawGame();
         }
-        // Daftarkan id frame ke global agar bisa dimatikan di sesi berikutnya
         window.renderFrameId = requestAnimationFrame(window.loop);
     };
     
-    // Mulai loop baru
     window.renderFrameId = requestAnimationFrame(window.loop);
-
+    
     function resizeCanvas() {
         let canvas1 = document.getElementById('canvas-p1'); let canvas2 = document.getElementById('canvas-p2');
         if(canvas1 && canvas1.parentElement) {
@@ -739,56 +662,9 @@ function initGame(p1Name, p2Name) {
             canvas2.width = canvas2.parentElement.clientWidth || 300; canvas2.height = canvas2.parentElement.clientHeight || 300;
         }
     }
-    
     if (!window.hasResizeListener) {
         window.addEventListener('resize', resizeCanvas);
         window.hasResizeListener = true;
     }
-    setTimeout(resizeCanvas, 100); 
+    setTimeout(resizeCanvas, 100);
 }
-
-window.resetPlayerEndless = function(playerObj) {
-    let resUp1 = document.getElementById('resurrect-overlay-p1'); if (resUp1) resUp1.classList.add('hidden');
-    let resUp2 = document.getElementById('resurrect-overlay-p2'); if (resUp2) resUp2.classList.add('hidden');
-    
-    let pState = playerObj == 1 ? window.p1State : window.p2State;
-    let pName = pState.name;
-    let pScore = pState.score;
-    let pStage = pState.stage;
-    let pRestarts = pState.endlessRestarts || 0; // Baca jumlah restart sebelumnya
-    
-    // Simpan skor sebelum mereset
-    saveToLeaderboard(pName, pScore, pStage);
-    
-    let diff = window.GameConfig.diff || 3;
-    let baseSize = 11 + ((diff - 1) * 2);
-    let bossInterval = window.GameConfig.bossInterval || 10;
-    
-    const baseState = () => ({ 
-        x: 1, y: 1, visualX: 1, visualY: 1, facingX: 1, facingY: 0, 
-        hasKey: false, inventory: [], activeBuffs: [], lightBuff: 0, 
-        score: 0, shieldAngle: 0, teleportAnchor: null,
-        ...window.PLAYER_BASE_STATE,
-        stage: 1, width: baseSize, height: baseSize, bossDefeated: 0, maxInvBonus: 0, resurrectCount: 0,
-        isPaused: false, isDead: false, isPromptingResurrect: false, isInvincible: false,
-        endlessRestarts: pRestarts + 1, // Tambahkan +1 pada data game pemain yang direstart
-        effects: [], stats: { kills: 0, dmgDealt: 0, dmgTaken: 0 }
-    });
-    
-    let newState = { ...baseState(), id: playerObj, name: pName, theme: playerObj == 1 ? 'ruins' : 'jungle', maze: generateMaze(baseSize, baseSize, 1 % bossInterval === 0) };
-    
-    if (playerObj == 1) window.p1State = newState;
-    else window.p2State = newState;
-    
-    populateEntities(newState);
-    updateStatsUI(playerObj);
-    
-    let overlay = document.getElementById(`dead-overlay-p${playerObj}`);
-    if(overlay) overlay.classList.add('hidden');
-    let btn = document.getElementById(`btn-restart-p${playerObj}`);
-    if(btn) btn.classList.add('hidden');
-    
-    let screen = document.getElementById(`p${playerObj}-screen`);
-    let effectClasses = ['effect-invincible', 'effect-damage', 'effect-heal', 'effect-buff', 'effect-attack'];
-    if(screen) effectClasses.forEach(c => screen.classList.remove(c));
-};

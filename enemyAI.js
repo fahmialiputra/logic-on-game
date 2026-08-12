@@ -1,5 +1,4 @@
-// enemyAI.js - Advanced AI with Critical Error Fallbacks
-
+// enemyAI.js - Advanced AI (Optimized)
 function getNextStepBFS(state, startX, startY, targetX, targetY) {
     let sx = Math.round(startX), sy = Math.round(startY);
     let tx = Math.round(targetX), ty = Math.round(targetY);
@@ -8,13 +7,11 @@ function getNextStepBFS(state, startX, startY, targetX, targetY) {
     let queue = [{x: sx, y: sy, firstStep: null}];
     let visited = new Set();
     visited.add(`${sx},${sy}`);
-    
     let dirs = [[0,-1], [0,1], [-1,0], [1,0]];
     
     while(queue.length > 0) {
         let curr = queue.shift();
         if (curr.x === tx && curr.y === ty) return curr.firstStep;
-        
         for(let d of dirs) {
             let nx = curr.x + d[0], ny = curr.y + d[1];
             if (nx >= 0 && nx < state.width && ny >= 0 && ny < state.height && state.maze[ny][nx] !== 1) {
@@ -33,52 +30,37 @@ function processContinuousEnemyAI(playerObj, state, dt, isWallFunc) {
     let px = state.x; let py = state.y;
     let isUntargetable = (state.hp <= 0 || state.isDead || state.isPaused || state.isPromptingResurrect);
     let diff = window.GameConfig.diff || 3;
-
     let exitX = -1, exitY = -1;
+    
     for (let y = 0; y < state.height; y++) {
         for (let x = 0; x < state.width; x++) {
             if (state.maze[y][x] === 3) { exitX = x; exitY = y; break; }
         }
         if (exitX !== -1) break;
     }
-
+    
     state.monsters.forEach((m) => {
         if (m.wanderTimer === undefined) m.wanderTimer = 0;
         if (m.wanderTarget === undefined) m.wanderTarget = null;
         if (m.atkCooldown === undefined) m.atkCooldown = 0;
         if (m.healUses === undefined) m.healUses = 0;
-        
         if (m.type === 'boss' && m.bossState === undefined) {
-            m.bossState = 'wander'; 
-            m.bossIdleTimer = 0;
-            m.wanderCount = 0;
+            m.bossState = 'wander'; m.bossIdleTimer = 0; m.wanderCount = 0;
         }
         
         let distToPlayer = Math.hypot(px - m.x, py - m.y);
         let distFromOrigin = Math.hypot(m.x - m.originX, m.y - m.originY);
         if (m.atkCooldown > 0) m.atkCooldown -= dt;
-
+        
         let dbE = window.ENEMY_DB[m.type] || window.ENEMY_DB['beast'];
         let speed = dbE.speed * dt;
         let isRanged = dbE.isRanged || false;
         let aggroRange = diff > 3 ? 4.5 : (isRanged ? 4.5 : 1.5);
         let r = 0.35;
         let atkRange = isRanged ? 3.5 : 0.8;
-
-        // Cek Line of Sight khusus jika target berada dalam jangkauan ATK
-        let hasLOS = false;
-        if (distToPlayer <= atkRange) {
-            hasLOS = true;
-            let steps = Math.max(Math.ceil(distToPlayer * 3), 1);
-            for (let i = 1; i <= steps; i++) {
-                let cx = m.x + (px - m.x) * (i / steps);
-                let cy = m.y + (py - m.y) * (i / steps);
-                let rx = Math.round(cx); let ry = Math.round(cy);
-                if (rx >= 0 && rx < state.width && ry >= 0 && ry < state.height && state.maze[ry][rx] === 1) { 
-                    hasLOS = false; break; 
-                }
-            }
-        }
+        
+        // EFISIENSI PEMBERSIHAN KODE: Panggil fungsi global agar tidak mengulang logika raycast Line-of-sight
+        let hasLOS = distToPlayer <= atkRange ? checkLineOfSight(state, m.x, m.y, px, py) : false;
 
         // BOSS HEAL
         if (m.type === 'boss' && m.hp < m.maxHp * 0.7 && m.healUses < 3) {
@@ -111,25 +93,20 @@ function processContinuousEnemyAI(playerObj, state, dt, isWallFunc) {
                     } else {
                         let reflectBuff = state.activeBuffs.find(b => b.isReflect);
                         if (reflectBuff && Math.random() < reflectBuff.reflectChance) {
-                            baseDmg = 0; 
-                            
-                            // FIX BUG: Cegah Boss Mati Konyol karena Reflect (Boss Wajib Ditebas Langsung!)
-                            if (m.type === 'boss') {
-                                m.hp = Math.max(1, m.hp - mAtk); 
-                            } else {
-                                m.hp -= mAtk;
-                                if (m.hp <= 0) m.isDeadFlag = true;
-                            }
+                            baseDmg = 0;
+                            if (m.type === 'boss') m.hp = Math.max(1, m.hp - mAtk);
+                            else { m.hp -= mAtk; if (m.hp <= 0) m.isDeadFlag = true; }
                             showToast(playerObj, "REFLECT!", `Musuh kena DMG`);
                         }
                     }
                 }
-
+                
                 let dmgToPlayer = baseDmg;
                 if (dmgToPlayer > 0 && state.shield > 0) {
-                    if (state.shield >= dmgToPlayer) { state.shield -= dmgToPlayer; dmgToPlayer = 0; } 
+                    if (state.shield >= dmgToPlayer) { state.shield -= dmgToPlayer; dmgToPlayer = 0; }
                     else { dmgToPlayer -= state.shield; state.shield = 0; }
                 }
+                
                 state.hp -= dmgToPlayer;
                 state.stats.dmgTaken += baseDmg;
                 
@@ -141,28 +118,17 @@ function processContinuousEnemyAI(playerObj, state, dt, isWallFunc) {
                 if (checkDeath(playerObj, state, m.name)) return;
             }
         } 
-        // 2. BOSS AI (Optimized Pathfinding)
+        // 2. BOSS AI (Optimized Pathfinding & LOS)
         else if (m.type === 'boss') {
-            let bossAggro = Math.hypot(state.width, state.height) * 0.45; // Area deteksi ditingkatkan
+            let bossAggro = Math.hypot(state.width, state.height) * 0.45;
             
             if (!isUntargetable && distToPlayer <= bossAggro) {
-                let hasLOS = true;
-                let steps = Math.max(Math.ceil(distToPlayer * 3), 1);
+                let bossLOS = checkLineOfSight(state, m.x, m.y, px, py);
                 
-                for (let i = 1; i <= steps; i++) {
-                    let cx = m.x + (px - m.x) * (i / steps);
-                    let cy = m.y + (py - m.y) * (i / steps);
-                    let rx = Math.round(cx); let ry = Math.round(cy);
-                    if (rx >= 0 && rx < state.width && ry >= 0 && ry < state.height && state.maze[ry][rx] === 1) { 
-                        hasLOS = false; break; 
-                    }
-                }
-
-                if (hasLOS) {
+                if (bossLOS) {
                     if (distToPlayer > 0.05) {
                         let dx = (px - m.x) / distToPlayer; let dy = (py - m.y) / distToPlayer;
                         let nextX = m.x + dx * speed; let nextY = m.y + dy * speed;
-                        
                         if (!isWallFunc(state, nextX - r, m.y - r) && !isWallFunc(state, nextX + r, m.y - r) && !isWallFunc(state, nextX - r, m.y + r) && !isWallFunc(state, nextX + r, m.y + r)) m.x = nextX;
                         if (!isWallFunc(state, m.x - r, nextY - r) && !isWallFunc(state, m.x + r, nextY - r) && !isWallFunc(state, m.x - r, nextY + r) && !isWallFunc(state, m.x + r, nextY + r)) m.y = nextY;
                     }
@@ -170,20 +136,16 @@ function processContinuousEnemyAI(playerObj, state, dt, isWallFunc) {
                 } else {
                     if (m.pathTimer === undefined) m.pathTimer = 0;
                     m.pathTimer -= dt;
-                    
                     if (m.pathTimer <= 0 || !m.bfsTarget) {
                         m.bfsTarget = getNextStepBFS(state, m.x, m.y, px, py);
-                        m.pathTimer = 0.3; // Hitung ulang rute setiap 0.3 detik agar responsif
+                        m.pathTimer = 0.3; 
                     }
-                    
                     if (m.bfsTarget) {
                         let tx = m.bfsTarget.x; let ty = m.bfsTarget.y;
                         let wDist = Math.hypot(tx - m.x, ty - m.y);
-                        
                         if (wDist > 0.05) {
                             let dx = (tx - m.x) / wDist; let dy = (ty - m.y) / wDist;
                             let nextX = m.x + dx * speed; let nextY = m.y + dy * speed;
-                            
                             if (!isWallFunc(state, nextX - r, m.y - r) && !isWallFunc(state, nextX + r, m.y - r) && !isWallFunc(state, nextX - r, m.y + r) && !isWallFunc(state, nextX + r, m.y + r)) m.x = nextX;
                             if (!isWallFunc(state, m.x - r, nextY - r) && !isWallFunc(state, m.x + r, nextY - r) && !isWallFunc(state, m.x - r, nextY + r) && !isWallFunc(state, m.x + r, nextY + r)) m.y = nextY;
                         } else {
@@ -198,8 +160,7 @@ function processContinuousEnemyAI(playerObj, state, dt, isWallFunc) {
                 if (m.bossState === 'idle') {
                     m.bossIdleTimer -= dt;
                     if (m.bossIdleTimer <= 0) { m.bossState = 'wander'; m.wanderTarget = null; }
-                } 
-                else if (m.bossState === 'returning') {
+                } else if (m.bossState === 'returning') {
                     if (distFromOrigin < 0.25) {
                         m.bossState = 'idle';
                         m.bossIdleTimer = 15 + Math.random() * 15;
@@ -211,15 +172,12 @@ function processContinuousEnemyAI(playerObj, state, dt, isWallFunc) {
                             if (!isWallFunc(state, m.x - r, nextY - r) && !isWallFunc(state, m.x + r, nextY - r) && !isWallFunc(state, m.x - r, nextY + r) && !isWallFunc(state, m.x + r, nextY + r)) m.y = nextY;
                         }
                     }
-                } 
-                else if (m.bossState === 'wander') {
+                } else if (m.bossState === 'wander') {
                     if (!m.wanderTarget || Math.hypot(m.wanderTarget.x - m.x, m.wanderTarget.y - m.y) < 0.3) {
                         let openTiles = [];
                         for (let y = 1; y < state.height - 1; y++) {
                             for (let x = 1; x < state.width - 1; x++) {
-                                if (state.maze[y][x] === 0 && Math.hypot(x - exitX, y - exitY) > 4.5) {
-                                    openTiles.push({x, y});
-                                }
+                                if (state.maze[y][x] === 0 && Math.hypot(x - exitX, y - exitY) > 4.5) openTiles.push({x, y});
                             }
                         }
                         if (openTiles.length > 0 && m.wanderCount < 5) {
@@ -244,19 +202,15 @@ function processContinuousEnemyAI(playerObj, state, dt, isWallFunc) {
         // 3. NORMAL MONSTER AI
         else {
             if (!isUntargetable && distToPlayer <= aggroRange && distFromOrigin <= aggroRange * 2) {
-                // Cegah monster maju menabrak pemain jika mereka adalah tipe ranged yang sudah dapat posisi tembak (LOS)
                 let shouldMove = !(isRanged && hasLOS && distToPlayer <= atkRange - 0.5);
-                
                 if (distToPlayer > 0.05 && shouldMove) {
                     let dx = (px - m.x) / distToPlayer; let dy = (py - m.y) / distToPlayer;
                     let nextX = m.x + dx * speed; let nextY = m.y + dy * speed;
-                    
                     if (!isWallFunc(state, nextX - r, m.y - r) && !isWallFunc(state, nextX + r, m.y - r) && !isWallFunc(state, nextX - r, m.y + r) && !isWallFunc(state, nextX + r, m.y + r)) m.x = nextX;
                     if (!isWallFunc(state, m.x - r, nextY - r) && !isWallFunc(state, m.x + r, nextY - r) && !isWallFunc(state, m.x - r, nextY + r) && !isWallFunc(state, m.x + r, nextY + r)) m.y = nextY;
                 }
                 m.wanderTarget = null;
-            } 
-            else {
+            } else {
                 if (!m.wanderTarget || Math.hypot(m.wanderTarget.x - m.x, m.wanderTarget.y - m.y) < 0.2) {
                     m.wanderTimer -= dt;
                     if (m.wanderTimer <= 0) {
@@ -267,7 +221,6 @@ function processContinuousEnemyAI(playerObj, state, dt, isWallFunc) {
                             let safeZone = Math.hypot(tx - m.originX, ty - m.originY) <= aggroRange;
                             return !isWallFunc(state, tx, ty) && safeZone;
                         });
-                        
                         if (validDirs.length > 0) {
                             let d = validDirs[Math.floor(Math.random() * validDirs.length)];
                             m.wanderTarget = { x: Math.round(m.x) + d[0], y: Math.round(m.y) + d[1] };
@@ -278,11 +231,9 @@ function processContinuousEnemyAI(playerObj, state, dt, isWallFunc) {
                 }
                 if (m.wanderTarget) {
                     let wDist = Math.hypot(m.wanderTarget.x - m.x, m.wanderTarget.y - m.y);
-                    // FIX BUG: Mencegah musuh biasa lenyap akibat jarak yang terlampau dekat (NaN state)
                     if (wDist > 0.05) {
                         let dx = (m.wanderTarget.x - m.x) / wDist; let dy = (m.wanderTarget.y - m.y) / wDist;
                         let nextX = m.x + dx * (speed * 0.45); let nextY = m.y + dy * (speed * 0.45);
-                        
                         if (!isWallFunc(state, nextX - r, m.y - r) && !isWallFunc(state, nextX + r, m.y - r) && !isWallFunc(state, nextX - r, m.y + r) && !isWallFunc(state, nextX + r, m.y + r)) m.x = nextX;
                         if (!isWallFunc(state, m.x - r, nextY - r) && !isWallFunc(state, m.x + r, nextY - r) && !isWallFunc(state, m.x - r, nextY + r) && !isWallFunc(state, m.x + r, nextY + r)) m.y = nextY;
                     }

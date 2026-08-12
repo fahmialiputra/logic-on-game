@@ -28,9 +28,10 @@
         <h2 class="neon-blue" style="margin-bottom: 30px;">MAIN MENU</h2>
         
         <div class="menu-container">
-            <button id="btn-play" class="btn-menu arcade-btn">🎮 Mulai Game</button>
+            <button id="btn-play" class="btn-menu arcade-btn">▶️ Mulai Game</button>
             <button id="btn-review" class="btn-menu arcade-btn" style="background: #8e44ad;">📚 Review Materi</button>
             <button id="btn-leaderboard" class="btn-menu arcade-btn btn-small" style="background: #e67e22;">🏆 Leaderboard</button>
+            <button id="btn-exit" class="btn-menu arcade-btn btn-danger" style="margin-top: 10px;">❌ Keluar</button>
         </div>
 
         <div id="leaderboard-panel" class="glass-panel hidden">
@@ -82,67 +83,91 @@
     
     <div id="modal-setting" class="modal hidden">
         <div class="modal-content glass-panel glow-blue">
-            <h3 class="neon-blue" style="text-align: center; border-bottom: 2px dashed #444; padding-bottom: 15px; margin-bottom: 10px;">  SETTINGS</h3>
+            <h3 class="neon-blue" style="text-align: center; border-bottom: 2px dashed #444; padding-bottom: 15px; margin-bottom: 10px;">⚙️ SETTINGS</h3>
             
             <div class="setting-grid">
-                <div class="setting-group" style="grid-column: 1 / -1;">
-                    <label style="color:#2ecc71;">URL Web App API (Leaderboard):</label>
-                    <input type="text" id="setting-api-url" class="custom-input" placeholder="https://script.google.com/macros/s/..." autocomplete="off">
-                </div>
-
                 <div class="setting-group">
-                    <label>  Timer (Time Trial): <span id="timer-val" style="color:#f1c40f;">2</span> Min</label>
+                    <label>⏳ Timer (Time Trial): <span id="timer-val" style="color:#f1c40f;">2</span> Min</label>
                     <input type="range" id="setting-timer" class="custom-range" min="1" max="15" value="2">
                 </div>
                 <div class="setting-group">
-                    <label>  Stage (Speedrun): <span id="stage-val" style="color:#f1c40f;">5</span> Stages</label>
+                    <label>🏁 Stage (Speedrun): <span id="stage-val" style="color:#f1c40f;">5</span> Stages</label>
                     <input type="range" id="setting-stage" class="custom-range" min="3" max="30" value="5">
                 </div>
-
                 <div class="setting-group">
-                    <label>  Difficulty:</label>
+                    <label>🔥 Difficulty:</label>
                     <div id="star-rating" class="star-rating">
-                        <span data-val="1" class="star active"> </span>
-                        <span data-val="2" class="star active"> </span>
-                        <span data-val="3" class="star active"> </span>
-                        <span data-val="4" class="star"> </span>
-                        <span data-val="5" class="star"> </span>
+                        <span data-val="1" class="star active">★</span>
+                        <span data-val="2" class="star active">★</span>
+                        <span data-val="3" class="star active">★</span>
+                        <span data-val="4" class="star">★</span>
+                        <span data-val="5" class="star">★</span>
                     </div>
                     <input type="hidden" id="setting-diff" value="3">
                 </div>
-
                 <div class="setting-group" id="boss-interval-group">
-                    <label>  Boss Muncul Tiap: <span id="boss-interval-val" style="color:#f1c40f;">10</span> Stage</label>
+                    <label>👹 Boss Muncul Tiap: <span id="boss-interval-val" style="color:#f1c40f;">10</span> Stage</label>
                     <input type="range" id="setting-boss-interval" class="custom-range" min="3" max="20" value="10">
                 </div>
 
                 <div class="setting-group flex-between">
-                    <label>  Batasi Restart (Endless)</label>
+                    <label>🛑 Batasi Restart (Endless)</label>
                     <label class="toggle-switch">
-                        <input type="checkbox" id="setting-limit-endless">
+                        <input type="checkbox" id="setting-limit-endless" checked> <!-- Tambah checked -->
                         <span class="toggle-slider"></span>
                     </label>
                 </div>
-                
                 <div class="setting-group">
                     <label>Max Restart: <span id="endless-limit-val" style="color:#f1c40f;">1</span>x</label>
                     <input type="range" id="setting-endless-limit-val" class="custom-range" min="1" max="5" value="1">
                 </div>
                 
                 <div class="setting-group">
-                    <label style="margin-bottom: 8px; display: block;">  Kunci Layar:</label>
+                    <label style="margin-bottom: 8px; display: block;">🛡️ Tampilan HP Musuh:</label>
+                    <div class="radio-pills">
+                        <label><input type="radio" name="enemy-hp-view" value="angka"><span>Angka</span></label>
+                        <label><input type="radio" name="enemy-hp-view" value="bar" checked><span>Bar</span></label>
+                        <label><input type="radio" name="enemy-hp-view" value="sembunyi"><span>Sembunyi</span></label>
+                    </div>
+                </div>
+                <div class="setting-group">
+                    <label style="margin-bottom: 8px; display: block;">📱 Kunci Layar:</label>
                     <div class="radio-pills">
                         <label><input type="radio" name="setting-orientation" value="auto" checked><span>Auto</span></label>
-                        <label><input type="radio" name="setting-orientation" value="portrait"><span>Potrait</span></label>
+                        <label><input type="radio" name="setting-orientation" value="portrait"><span>Portrait</span></label>
                         <label><input type="radio" name="setting-orientation" value="landscape"><span>Landscape</span></label>
                     </div>
                 </div>
+                <div class="setting-group flex-between">
+                    <label>🕹️ Mode Analog (Smooth)</label>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="setting-smooth" checked> <!-- Tambah checked -->
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
 
-                <div class="setting-group" style="grid-column: 1 / -1;">
-                    <label style="color: #3498db; text-align: center; display: block; border-top: 1px dashed #555; padding-top: 10px;">  Mendukung Kontrol Gamepad & Keyboard</label>
+                <div class="setting-group" style="grid-column: 1 / -1; border-top: 1px dashed #555; padding-top: 10px;">
+                    <label style="color: #3498db; text-align: center; display: block; margin-bottom: 10px;">🎮 Konfigurasi Input Pemain</label>
+                    <div style="display: flex; gap: 15px; justify-content: space-between; margin-bottom: 10px;">
+                        <div style="flex: 1; text-align: left;">
+                            <label style="font-size: 0.65rem; color: #3498db;">P1 Kontrol:</label>
+                            <select id="input-select-p1" class="custom-input" style="padding: 8px; font-size: 0.6rem; cursor: pointer;">
+                                <option value="keyboard">Keyboard</option>
+                                <option value="touch">Sentuh Layar (Virtual)</option>
+                                <option value="gamepad">Gamepad Fisik</option>
+                            </select>
+                        </div>
+                        <div style="flex: 1; text-align: left;">
+                            <label style="font-size: 0.65rem; color: #2ecc71;">P2 Kontrol:</label>
+                            <select id="input-select-p2" class="custom-input" style="padding: 8px; font-size: 0.6rem; cursor: pointer;">
+                                <option value="touch">Sentuh Layar (Virtual)</option>
+                                <option value="keyboard">Keyboard</option>
+                                <option value="gamepad">Gamepad Fisik</option>
+                            </select>
+                        </div>
+                    </div>
                     <p style="font-size: 0.55rem; color: #aaa; text-align: center; margin-top: 5px; line-height: 1.6;">
-                        <strong>[P1]</strong> WASD/D-Pad (Gerak), SPASI/A (Serang), E/B (Ambil), Q/Y (Tas)<br>
-                        <strong>[P2]</strong> Arah/Analog (Gerak), ENTER/A (Serang), SHIFT/B (Ambil), P/Y (Tas)
+                        <strong>Keyboard/Gamepad:</strong> Saat tas terbuka, gunakan <strong>Arah</strong> untuk navigasi, <strong>SPASI/A</strong> gunakan item, <strong>Q/B</strong> tutup tas.
                     </p>
                 </div>
             </div>
@@ -236,6 +261,7 @@
                 <div id="score-p1-wrap" class="player-badge p1-badge">
                     <div class="badge-name">P1 <span id="header-p1-stage" class="badge-stage">[St.1]</span></div>
                     <div class="badge-score">🏆 <span id="p1-score">0</span></div>
+                    <button id="toggle-input-p1" class="btn-input-toggle" data-player="1" title="Ubah Kontrol P1">⌨️</button>
                 </div>
                 
                 <div class="timer-badge">
@@ -245,6 +271,7 @@
                 <div id="score-p2-wrap" class="player-badge p2-badge">
                     <div class="badge-name">P2 <span id="header-p2-stage" class="badge-stage">[St.1]</span></div>
                     <div class="badge-score">🏆 <span id="p2-score">0</span></div>
+                    <button id="toggle-input-p2" class="btn-input-toggle" data-player="2" title="Ubah Kontrol P2">📱</button>
                 </div>
             </div>
         </div>
