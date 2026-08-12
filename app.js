@@ -27,7 +27,7 @@ window.GameAssets = {
   }
 };
 
-window.GameConfig = { timer: 2, diff: 3, smooth: false, enemyHpView: 'angka', mode: 'time-trial', maxStage: 5, players: 2, orientation: 'auto', endlessLimitEnabled: false, endlessLimit: 1, bossInterval: 10, apiUrl: "" };
+window.GameConfig = { timer: 2, diff: 3, smooth: false, enemyHpView: 'angka', mode: 'time-trial', maxStage: 5, players: 2, orientation: 'auto', endlessLimitEnabled: false, endlessLimit: 1, bossInterval: 10, apiUrl: "https://script.google.com/macros/s/AKfycbyPk0c9xaWLfc6V2LYuRqUthm9fCtLO6Cm8ZXd16Uh1XgEUxsRJ0dm8OJhfDrxZF1E/exec" };
 
 window.CustomDialog = {
   show: function(title, message, buttons) {
